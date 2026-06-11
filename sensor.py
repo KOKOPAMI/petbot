@@ -89,7 +89,7 @@ class TemperatureSensor:
             try:
                 tobj = self.read_object_c()
                 tsen = self.read_sensor_c()
-                print(f"📡 [RAW 디버깅] 체온(Obj): {tobj:.1f} °C | 센서주변(Sen): {tsen:.1f} °C")
+                # print(f"📡 [RAW 디버깅] 체온(Obj): {tobj:.1f} °C | 센서주변(Sen): {tsen:.1f} °C")
                 
                 if 15.0 < tobj < 45.0:  
                     self.pet_temp = tobj

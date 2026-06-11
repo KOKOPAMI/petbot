@@ -217,72 +217,36 @@ video{
     color: #8b949e;
 }
 
-/* 조이스틱 버튼 */
+/* ========================================================
+   🕹️ [추가] 가상 조이스틱 (NippleJS) 스타일 구역
+   ======================================================== */
 
-.control-pad{
-
-    margin-top:30px;
-
-    display:grid;
-
-    grid-template-columns:100px 100px 100px;
-
-    grid-template-rows:100px 100px 100px;
-
-    gap:15px;
-
-    justify-content:center;
-}
-
-/* 방향 버튼 */
-
-.control-btn {
-    width: 100px;
-    height: 100px;
+/* 조이스틱을 감싸는 전체 구역 영역 지정 */
+.joystick-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 220px; /* 조이스틱이 노는데 답답하지 않은 높이 */
+    margin-top: 20px;
+    margin-bottom: 90px; /* 💡 하단 네비게이션 바(70px)에 가려지지 않도록 안전 마진 추가 */
+    background: rgba(22, 27, 34, 0.6); /* 대시보드 테마와 통일감을 주는 반투명 어두운 배경 */
     border: 1px solid #30363d;
-    border-radius: 50%;
-    background: #21262d;
-    color: #ffffff;
-    font-size: 28px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    cursor: pointer;
-    transition: all 0.2s;
+    border-radius: 20px;
+    box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.15); /* 은은한 하이테크 네온 블루 광채 */
+    position: relative;
 }
 
-/* STOP 버튼 */
-
-.stop-btn{
-
-    background:#ff5b5b;
-
-    color:white;
+/* 실제 조이스틱 가상 패드가 생성되는 터치 영역 존 */
+#joystick-zone {
+    width: 200px;
+    height: 200px;
+    position: relative;
 }
 
-/* 버튼 위치 */
-
-.forward{
-    grid-column:2;
-    grid-row:1;
-}
-
-.left{
-    grid-column:1;
-    grid-row:2;
-}
-
-.stop{
-    grid-column:2;
-    grid-row:2;
-}
-
-.right{
-    grid-column:3;
-    grid-row:2;
-}
-
-.back{
-    grid-column:2;
-    grid-row:3;
+/* 💡 NippleJS가 생성하는 가상 패드 자체의 터치 반응성 보완 */
+#joystick-zone .nipple {
+    transition: opacity 0.2s ease;
 }
 
 /* 모바일 대응 */

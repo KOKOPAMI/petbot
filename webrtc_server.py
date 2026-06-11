@@ -12,7 +12,6 @@ import threading
 from sensor import TemperatureSensor
 is_running = True
 sensor_driver = TemperatureSensor()
-sensor_driver.start_loop()
 
 # tracking.py 호출
 from tracking import RobotTracker
@@ -263,6 +262,10 @@ async def get_status(request):
 # 서버 가동 및 비상 안전 장치 구역
 # ==========================================
 async def start_background_tasks(app_context):
+    # 💡 서버 링크가 출력된 후, 여기서 센서 루프를 안전하게 가동합니다.
+    sensor_driver.start_loop() 
+    print("🌡️ [3단계] 실시간 체온 센서 하드웨어 루프 가동 완료")
+
     t_cam = threading.Thread(target=camera_reader_thread, daemon=True)
     t_cam.start()
 

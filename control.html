@@ -70,43 +70,8 @@
             </button>
         </div>
 
-        <div class="card">
-            <h2 style="text-align:center;">컨트롤 패드</h2>
-            <div class="control-pad">
-                <button class="control-btn forward"
-                        onmousedown="sendCommand('FORWARD')"
-                        onmouseup="sendCommand('STOP')"
-                        ontouchstart="event.preventDefault(); sendCommand('FORWARD')"
-                        ontouchend="event.preventDefault(); sendCommand('STOP')"
-                        ontouchcancel="event.preventDefault(); sendCommand('STOP')"> ▲
-                </button>
-
-                <button class="control-btn left"
-                onmousedown="sendCommand('LEFT')"
-                onmouseup="sendCommand('STOP')"
-                ontouchstart="event.preventDefault(); sendCommand('LEFT')"
-                ontouchend="event.preventDefault(); sendCommand('STOP')">
-                ◀
-                </button>
-
-                <button class="control-btn stop stop-btn" onclick="sendCommand('STOP')">■</button>
-
-                <button class="control-btn right"
-                onmousedown="sendCommand('RIGHT')"
-                onmouseup="sendCommand('STOP')"
-                ontouchstart="event.preventDefault(); sendCommand('RIGHT')"
-                ontouchend="event.preventDefault(); sendCommand('STOP')">
-                ▶
-                </button>
-
-                <button class="control-btn back"
-                onmousedown="sendCommand('BACK')"
-                onmouseup="sendCommand('STOP')"
-                ontouchstart="event.preventDefault(); sendCommand('BACK')"
-                ontouchend="event.preventDefault(); sendCommand('STOP')">
-                ▼
-                </button>
-            </div>
+        <div class="joystick-wrapper">
+            <div id="joystick-zone"></div>
         </div>
 
     </div>
@@ -312,6 +277,44 @@ async function toggleMic() {
 
 // 페이지 로드 시 기본적으로 영상만 나오도록 초기 실행
 startWebRTC(false);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+<script>
+    const joystickZone = document.getElementById('joystick-zone');
+    
+    const options = {
+        zone: joystickZone,
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: '#00e5ff',
+        size: 150
+    };
+
+    const manager = nipplejs.create(options);
+    let lastSentJoystickCommand = "STOP";
+
+    manager.on('move', function (evt, data) {
+        if (!data.direction) return;
+
+        const direction = data.direction.angle; 
+        let command = "STOP";
+
+        if (direction === 'up') command = "FORWARD";
+        else if (direction === 'down') command = "BACK";
+        else if (direction === 'left') command = "LEFT";
+        else if (direction === 'right') command = "RIGHT";
+
+        if (command !== lastSentJoystickCommand) {
+            // 💡 기존에 정의되어 있는 sendCommand 함수를 그대로 호출해 줍니다!
+            sendCommand(command);
+            lastSentJoystickCommand = command;
+        }
+    });
+
+    manager.on('end', function () {
+        sendCommand("STOP");
+        lastSentJoystickCommand = "STOP";
+    });
 </script>
 
 </body>
