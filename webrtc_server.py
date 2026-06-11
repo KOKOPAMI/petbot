@@ -2,78 +2,17 @@ import cv2
 import av
 import json
 import asyncio
-import threading
-import time
-import random
 import pyaudio
 import queue
+import time
+import threading
 
-# =================================================================
-# 🌡️ DTPM151 체온 센서 SPI 설정 구역 - 기존 테스트 코드 기준
-# =================================================================
-SENSOR_ENABLED = True
-is_running = True  # 스레드들의 안전한 종료를 제어하는 전역 플래그
 
-try:
-    import os
-    os.environ.setdefault("JETSON_MODEL_NAME", "JETSON_ORIN_NANO")
-
-    import spidev
-    import Jetson.GPIO as GPIO
-
-    BUS, CS_DEV = 0, 0
-    CS_BCM = 8
-
-    SPI_MODE = 3
-    SPI_SPEED = 1_000_000
-
-    CMD_OBJ = 0xA0
-    CMD_SEN = 0xA1
-
-    def usleep(us):
-        time.sleep(us / 1_000_000.0)
-
-    def s16(v):
-        return v - 0x10000 if (v & 0x8000) else v
-
-    spi = spidev.SpiDev()
-    spi.open(BUS, CS_DEV)
-    spi.mode = SPI_MODE
-    spi.max_speed_hz = SPI_SPEED
-
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
-    GPIO.setup(CS_BCM, GPIO.OUT, initial=GPIO.HIGH)
-
-    def read16(cmd):
-        if not SENSOR_ENABLED:
-            return 0
-
-        GPIO.output(CS_BCM, GPIO.LOW)
-        usleep(10)
-
-        spi.xfer2([cmd])
-        usleep(10)
-
-        lo = spi.xfer2([0x22])[0]
-        usleep(10)
-
-        hi = spi.xfer2([0x22])[0]
-        usleep(10)
-
-        GPIO.output(CS_BCM, GPIO.HIGH)
-
-        return (hi << 8) | lo
-
-    def read_object_c():
-        return round(s16(read16(CMD_OBJ)) / 10.0, 1)
-
-    def read_sensor_c():
-        return round(s16(read16(CMD_SEN)) / 10.0, 1)
-
-except Exception as e:
-    print(f"⚠️ [하드웨어 알림] 젯슨 SPI 센서를 초기화할 수 없습니다 ({e}). 시뮬레이션 모드로 작동합니다.")
-    SENSOR_ENABLED = False
+# sensor.py 호출 및 센서 인스턴스 생성 및 루프 시작
+from sensor import TemperatureSensor
+is_running = True
+sensor_driver = TemperatureSensor()
+sensor_driver.start_loop()
 
 # =================================================================
 # YOLO 모델 및 카메라 초기화 (정상 확인된 1번 카메라 고정)
@@ -130,18 +69,6 @@ def camera_reader_thread():
             raw_camera_frame = frame
         else:
             time.sleep(0.01)
-
-def temp_sensor_reader_thread():
-    global pet_temp, is_running
-   
-    if not SENSOR_ENABLED:
-        print("🌡️ [3단계] 센서 하드웨어 부재 -> 가상 체온 시뮬레이터 가동 시작")
-        while is_running:
-            pet_temp = round(36.5 + random.uniform(-0.2, 0.2), 1)
-            time.sleep(0.5)
-        return
-
-    print("🌡️ [3단계] 젯슨 실물 DTPM151 하드웨어 센서 루프 가동 완료")
     
     # 초기 안정화 센서 예열
     for _ in range(3):
@@ -481,7 +408,6 @@ async def offer(request):
 
 async def get_status(request):
     global detected_object, current_state, battery, wifi, robot_state, motor_left, motor_right
-    global pet_temp  
    
     return web.json_response({
         "battery": battery,
@@ -501,10 +427,7 @@ async def get_status(request):
 async def start_background_tasks(app_context):
     t_cam = threading.Thread(target=camera_reader_thread, daemon=True)
     t_cam.start()
-   
-    t_temp = threading.Thread(target=temp_sensor_reader_thread, daemon=True)
-    t_temp.start()
-   
+
     app_context['camera_loop'] = asyncio.create_task(camera_inference_loop())
 
 async def cleanup_background_tasks(app_context):
@@ -524,14 +447,7 @@ async def on_shutdown(app_context):
         pass
         
     cap.release()
-   
-    if SENSOR_ENABLED:
-        try:
-            SENSOR_ENABLED = False
-            spi.close()
-        except:
-            pass
-
+    sensor_driver.close()
     close_connections = [pc.close() for pc in pcs]
     if close_connections:
         await asyncio.gather(*close_connections)
