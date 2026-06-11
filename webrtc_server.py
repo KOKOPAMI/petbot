@@ -61,36 +61,6 @@ def camera_reader_thread():
             raw_camera_frame = frame
         else:
             time.sleep(0.01)
-    
-    # 초기 안정화 센서 예열
-    for _ in range(3):
-        try:
-            read_object_c()
-            read_sensor_c()
-        except:
-            pass
-        time.sleep(0.05)
-       
-    print_counter = 0
-    while is_running:
-        try:
-            if not SENSOR_ENABLED:
-                break
-                
-            tobj = read_object_c()
-            tsen = read_sensor_c()
-           
-            # 💡 [여기 수정] 필터링 조건과 상관없이 무조건 0.5초마다 터미널에 원본을 찍습니다!
-            print(f"📡 [RAW 디버깅] 체온(Obj): {tobj:.1f} °C | 센서주변(Sen): {tsen:.1f} °C")
-            
-            if 15.0 < tobj < 45.0:  
-                pet_temp = tobj
-               
-        except Exception as e:
-            # 에러가 나면 숨기지 말고 터미널에 범인을 출력합니다.
-            print(f"⚠️ 센서 읽기 실패 원인: {e}")
-            
-        time.sleep(0.5)
 
 async def camera_inference_loop():
     global raw_camera_frame, latest_annotated_frame, is_running
@@ -303,7 +273,7 @@ async def cleanup_background_tasks(app_context):
     await app_context['camera_loop']
 
 async def on_shutdown(app_context):
-    global SENSOR_ENABLED, is_running
+    global is_running
     print("🚨 로봇 관제 웹 서버 정지 절차에 진입합니다.")
     
     is_running = False  # 모든 스레드 루프 중단 유도
@@ -315,7 +285,8 @@ async def on_shutdown(app_context):
         pass
         
     cap.release()
-    sensor_driver.close()
+    sensor_driver.close() # 존재하지 않던 SENSOR_ENABLED 조건문을 걷어내고 안전하게 직접 종료합니다.
+    
     close_connections = [pc.close() for pc in pcs]
     if close_connections:
         await asyncio.gather(*close_connections)
@@ -351,6 +322,7 @@ if __name__ == "__main__":
         try:
             set_motor_speed(0, 0)
             cap.release()
+            sensor_driver.close()
         except:
             pass
         print("👋 시스템 완전히 안전 종료됨.")
