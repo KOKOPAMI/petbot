@@ -40,9 +40,9 @@
                 <span id="detected" style="color: #ff5722; font-weight: bold;">NONE</span>
             </div>
 
-            <div class="status-row">
-                <span>온도</span>
-                <span id="temperature">24°C</span> 
+            <div class="sensor-card">
+                <span>🐾 반려동물 체온</span>
+                <h2 id="pet-temp-display">--.- °C</h2>
             </div>
 
             <div class="status-row">
@@ -78,6 +78,33 @@
     </div>
 
 <script>
+
+// ========================================================
+// 🚨 [보안 우회] 서비스 워커 등록 및 권한 자동 요청 구역
+// ========================================================
+let swRegistration = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. 브라우저 푸시 알림 권한 기본 요청
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("🏅 모니터링 화면 알림 권한 허용 완료");
+            }
+        });
+    }
+
+    // 2. 🔥 모바일 크롬이 설정창으로 강제 튕기는 것을 막는 가상 서비스 워커 로드
+    if ('serviceWorker' in navigator) {
+        // 비어있는 가상 서비스 워커 스크립트를 인라인으로 등록하여 브라우저 포커스 강제 체결
+        navigator.serviceWorker.register("data:text/javascript,self.addEventListener('notificationclick', function(e) { e.notification.close(); e.waitUntil(clients.matchAll({type: 'window'}).then(function(clientList) { for (var i = 0; i < clientList.length; i++) { var client = clientList[i]; if ('focus' in client) return client.focus(); } if (clients.openWindow) return clients.openWindow('/'); })); });")
+        .then(reg => {
+            swRegistration = reg;
+            console.log("🚀 크롬 설정창 튕김 우회 전용 가상 서비스 워커 바인딩 성공");
+        }).catch(err => console.error("서비스 워커 등록 실패:", err));
+    }
+});
+
 // =========================
 // 페이지 이동
 // =========================
@@ -94,6 +121,7 @@ function goControl(){
 // AUTO TRACK (상태 동기화 로직 보완)
 // =========================
 let tracking = false;
+let isAlertCooldown = false; // 💡 [추가] 알림이 30초에 한 번만 가도록 제어하는 방패 변수
 
 async function toggleTracking(){
     try {
@@ -124,19 +152,72 @@ function updateButtonUI(isTracking) {
     }
 }
 
-// =========================
+// ========================================================
 // 실시간 갱신 (상태 데이터 연동 및 단일화)
-// =========================
+// ========================================================
 async function updateStatus(){
     try {
         const res = await fetch("/status");
         if (!res.ok) return;
         const data = await res.json();
 
+        // 1. 기본 데이터 갱신
         document.getElementById("detected").innerText = data.detected;
         document.getElementById("mode").innerText = data.mode;
         document.getElementById("motor").innerText = `${data.left} / ${data.right}`;
 
+        // 2. 펫봇 실시간 체온 연동 및 고열 푸시 알림 로직
+        const tempDisplay = document.getElementById("pet-temp-display");
+        if (tempDisplay && data.pet_temp !== undefined) {
+            tempDisplay.innerText = `${data.pet_temp} °C`;
+            
+            const CRITICAL_TEMP = 39.5; // 위험 기준 온도
+            
+            if (data.pet_temp >= CRITICAL_TEMP) {
+                tempDisplay.style.color = "#ff4d4d"; // 텍스트 빨간색 변경
+                tempDisplay.style.fontWeight = "bold";
+                
+                // 알림 권한이 있고 쿨다운 가드가 풀렸을 때 실행
+                if (Notification.permission === "granted" && !isAlertCooldown) {
+                    
+                    const notificationOptions = {
+                        body: `현재 아이의 체온이 ${data.pet_temp}°C 입니다! 즉시 상태를 확인해 주세요.`,
+                        tag: "pet-fever-alert-monitor",
+                        requireInteraction: true // 사용자가 닫기 전까지 화면 고정
+                    };
+
+                    // 💡 [핵심 수정] 서비스 워커가 준비되었다면 시스템 레벨 푸시로 우회 발송
+                    if (swRegistration) {
+                        swRegistration.showNotification("🚨 [모니터링] 반려동물 고열 감지 경고", notificationOptions);
+                    } else {
+                        // 서비스 워커 로드가 덜 되었을 때를 대비한 백업용 기존 알림
+                        const feverAlert = new Notification("🚨 [모니터링] 반려동물 고열 감지 경고", notificationOptions);
+                        feverAlert.onclick = function(event) {
+                            event.preventDefault();
+                            window.focus();
+                            feverAlert.close();
+                        };
+                    }
+                    
+                    // 스마트폰 진동 효과
+                    if (navigator.vibrate) {
+                        navigator.vibrate([500, 200, 500, 200, 500]); 
+                    }
+                    
+                    // 알림 중복 폭탄 방지 가드 가동 (30초 동결)
+                    isAlertCooldown = true;
+                    setTimeout(() => {
+                        isAlertCooldown = false;
+                        console.log("모니터링 화면 알림 쿨다운 해제");
+                    }, 30000); 
+                }
+            } else {
+                tempDisplay.style.color = "#ffffff"; // 정상 온도일 때는 흰색
+                tempDisplay.style.fontWeight = "normal";
+            }
+        }
+
+        // 기존 자율주행 모드 동기화 유지
         tracking = (data.mode !== "MANUAL");
         updateButtonUI(tracking);
     } catch (e) {
@@ -144,6 +225,7 @@ async function updateStatus(){
     }
 }
 
+// 기존 주기 세팅 (0.5초마다 갱신)
 setInterval(updateStatus, 500);
 
 // ========================================================
