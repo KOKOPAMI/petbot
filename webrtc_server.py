@@ -14,6 +14,10 @@ is_running = True
 sensor_driver = TemperatureSensor()
 sensor_driver.start_loop()
 
+# tracking.py 호출
+from tracking import RobotTracker
+tracker = RobotTracker()
+
 # =================================================================
 # YOLO 모델 및 카메라 초기화 (정상 확인된 1번 카메라 고정)
 # =================================================================
@@ -36,23 +40,11 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 cap.set(cv2.CAP_PROP_FPS, 20)
 
-detected_object = "NONE"
 battery = 82
 wifi = "CONNECTED"
 robot_state = "ONLINE"
-
-motor_left = 0
-motor_right = 0
-
 raw_camera_frame = None      
 latest_annotated_frame = None
-
-prev_error = 0
-
-current_state = "MANUAL"  
-state_timer = 0          
-lost_start_time = 0      
-last_turn_dir = 1
 
 pet_temp = 36.5  # 🌡️ 전역 변수
 
@@ -100,133 +92,6 @@ def camera_reader_thread():
             
         time.sleep(0.5)
 
-# ==========================================
-# YOLO 분석 및 영상 처리 알고리즘 루프
-# ==========================================
-def process_yolo_and_control(frame, model_engine):
-    global current_state, motor_left, motor_right, detected_object
-    global state_timer, lost_start_time, last_turn_dir
-    global prev_error
-
-    small_frame = cv2.resize(frame, (416, 234))
-    results = model_engine(small_frame, imgsz=416, conf=0.65, verbose=False)
-    boxes = results[0].boxes
-   
-    if boxes is not None and len(boxes) > 0:
-        cls = int(boxes.cls[0].item())
-        target_name = results[0].names[cls]
-       
-        if target_name in ["Dog", "Cat"]:
-            detected_object = target_name
-        else:
-            detected_object = "NONE"
-    else:
-        detected_object = "NONE"
-
-    annotated_frame = frame.copy()
-    current_time = time.time()
-
-    if current_state == "MANUAL":
-        pass
-
-    elif current_state == "EXPLORATION":
-        if detected_object != "NONE":
-            current_state = "TRACKING"
-            print("🎯 [STATE] EXPLORATION -> TRACKING (대상 발견)")
-        else:
-            action_elapsed = current_time - state_timer
-            if action_elapsed < 5.0:
-                motor_left, motor_right = 120, 120
-            elif action_elapsed < 6.5:
-                motor_left = -100 * last_turn_dir
-                motor_right = 100 * last_turn_dir
-            else:
-                state_timer = current_time
-                last_turn_dir *= -1
-           
-            set_motor_speed(motor_left, motor_right)
-            cv2.putText(annotated_frame, "MODE: EXPLORATION (PATROL)", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
-
-    elif current_state == "TRACKING":
-        if detected_object == "NONE":
-            current_state = "RECOVERY"
-            lost_start_time = current_time
-            prev_error = 0
-            print("⚠️ [STATE] TRACKING -> RECOVERY (대상 유실)")
-        else:
-            best_box = max(boxes, key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]))
-            x1, y1, x2, y2 = map(int, best_box.xyxy[0])
-           
-            cv2.rectangle(annotated_frame, (x1*2, y1*2), (x2*2, y2*2), (0, 255, 0), 2)
-            cv2.putText(annotated_frame, f"TRACKING: {detected_object}", (x1*2, y1*2 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-            frame_h = small_frame.shape[0]  
-            box_height = int(y2 - y1)
-            height_ratio = box_height / frame_h  
-
-            center_x = (x1 + x2) // 2
-            frame_center = small_frame.shape[1] // 2  
-            error = center_x - frame_center
-
-            if abs(error) < 20:
-                error = 0
-
-            Kp = 0.38  
-            Kd = 0.18  
-
-            derivative = error - prev_error
-            control = (Kp * error) + (Kd * derivative)
-            control = max(-60, min(60, control))
-            prev_error = error
-
-            if height_ratio < 0.25:
-                forward = 120
-                distance_status = "FAR (APPROACH)"
-            elif height_ratio < 0.45:
-                forward = 60
-                distance_status = "MID (SLOW DOWN)"
-            elif height_ratio < 0.60:
-                forward = 0
-                distance_status = "ARRIVED (STOP)"
-                if abs(error) < 40:
-                    control = 0
-            else:
-                forward = -60
-                distance_status = "TOO CLOSE (BACKUP)"
-
-            left = int(max(-255, min(255, forward + control)))
-            right = int(max(-255, min(255, forward - control)))
-
-            MIN_SPEED = 90
-           
-            if left != 0 and abs(left) < MIN_SPEED:
-                left = MIN_SPEED if left > 0 else -MIN_SPEED
-            if right != 0 and abs(right) < MIN_SPEED:
-                right = MIN_SPEED if right > 0 else -MIN_SPEED
-
-            motor_left, motor_right = left, right
-            set_motor_speed(motor_left, motor_right)
-
-            cv2.putText(annotated_frame, f"MODE: TRACKING ({distance_status})", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-    elif current_state == "RECOVERY":
-        if detected_object != "NONE":
-            current_state = "TRACKING"
-            print("🔄 [STATE] RECOVERY -> TRACKING (복구 성공)")
-        else:
-            lost_elapsed = current_time - lost_start_time
-            if lost_elapsed <= 5.0:
-                motor_left, motor_right = -90, 90
-                set_motor_speed(motor_left, motor_right)
-                cv2.putText(annotated_frame, f"MODE: RECOVERY ({5.0 - lost_elapsed:.1f}s)", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-            else:
-                current_state = "EXPLORATION"
-                state_timer = current_time  
-                print("■ [STATE] RECOVERY -> EXPLORATION (복구 실패, 순찰 복귀)")
-
-    return annotated_frame
-
 async def camera_inference_loop():
     global raw_camera_frame, latest_annotated_frame, is_running
     print("✅ [2단계] 백그라운드 YOLO 분석 및 모터 제어 루프 가동 시작")
@@ -238,9 +103,13 @@ async def camera_inference_loop():
                 continue
 
             current_frame = raw_camera_frame.copy()
+            
             annotated_frame = await asyncio.to_thread(
-                process_yolo_and_control, current_frame, model
+                tracker.process_yolo_and_control, 
+                current_frame, 
+                model
             )
+            
             latest_annotated_frame = annotated_frame
             await asyncio.sleep(0.04)
 
@@ -285,8 +154,7 @@ async def style(request):
         return web.Response(text=f.read(), content_type="text/css")
 
 async def control(request):
-    global current_state, last_command, state_timer
-    global motor_left, motor_right
+    global last_command # 💡여기에 있던 current_state, motor_left 등 전역 변수 선언 삭제
 
     data = await request.json()
     command = data.get("command", "STOP")
@@ -296,34 +164,34 @@ async def control(request):
     last_command = command
 
     if command == "AUTO_TRACK_ON":
-        if detected_object != "NONE":
-            current_state = "TRACKING"
+        if tracker.detected_object != "NONE": # 💡 tracker 객체 참조
+            tracker.current_state = "TRACKING"
         else:
-            current_state = "EXPLORATION"
-            state_timer = time.time()
+            tracker.current_state = "EXPLORATION"
+            tracker.state_timer = time.time()
         return web.Response(text="AUTO MODE START")
 
     elif command == "AUTO_TRACK_OFF" or command == "STOP":
-        current_state = "MANUAL"
-        motor_left, motor_right = 0, 0
+        tracker.current_state = "MANUAL"      # 💡 tracker 객체 참조
+        tracker.motor_left, tracker.motor_right = 0, 0
         set_motor_speed(0, 0)
         return web.Response(text="MANUAL MODE (STOP)")
 
-    current_state = "MANUAL"
+    tracker.current_state = "MANUAL"          # 💡 tracker 객체 참조
     speed = 160
 
     if command == "FORWARD":
-        motor_left, motor_right = speed, speed
+        tracker.motor_left, tracker.motor_right = speed, speed
     elif command == "BACK":
-        motor_left, motor_right = -speed, -speed
+        tracker.motor_left, tracker.motor_right = -speed, -speed
     elif command == "LEFT":
-        motor_left, motor_right = -100, 100
+        tracker.motor_left, tracker.motor_right = -100, 100
     elif command == "RIGHT":
-        motor_left, motor_right = 100, -100
+        tracker.motor_left, tracker.motor_right = 100, -100
     else:
-        motor_left, motor_right = 0, 0
+        tracker.motor_left, tracker.motor_right = 0, 0
 
-    set_motor_speed(motor_left, motor_right)
+    set_motor_speed(tracker.motor_left, tracker.motor_right)
     return web.Response(text="OK")
 
 audio_queue = queue.Queue(maxsize=2)
@@ -407,18 +275,18 @@ async def offer(request):
     )
 
 async def get_status(request):
-    global detected_object, current_state, battery, wifi, robot_state, motor_left, motor_right
+    global battery, wifi, robot_state 
    
     return web.json_response({
         "battery": battery,
         "wifi": wifi,
         "state": robot_state,
-        "detected": detected_object,
-        "tracking": current_state != "MANUAL",
-        "mode": current_state,                  
-        "left": motor_left,
-        "right": motor_right,
-        "pet_temp": round(pet_temp, 1)  
+        "detected": tracker.detected_object,          # 💡 tracker 데이터로 매핑
+        "tracking": tracker.current_state != "MANUAL", # 💡 tracker 데이터로 매핑
+        "mode": tracker.current_state,                 # 💡 tracker 데이터로 매핑                 
+        "left": tracker.motor_left,                   # 💡 tracker 데이터로 매핑
+        "right": tracker.motor_right,                 # 💡 tracker 데이터로 매핑
+        "pet_temp": round(sensor_driver.pet_temp, 1)  
     })
 
 # ==========================================

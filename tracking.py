@@ -1,161 +1,146 @@
-from ultralytics import YOLO
+# tracking.py
 import cv2
+import time
+import numpy as np
 from motor import set_motor_speed
-from utils import get_direction
 
-def run_tracking():
-
-    # YOLO 모델 로드
-    model = YOLO("best (1).pt")
-
-    # 제어 파라미터
-    Kp = 0.3    # 회전 민감도
-    base_speed = 120 # 기본 전진 속도
-    min_area = 20000 # 거리 유지 기준
-    max_area = 50000
-
-    # YOLO Tracking 시작
-    results = model.track(
-        source=0,
-        stream=True,
-        persist=True,
-        conf=0.5,
-        imgsz=224,
-        tracker="bytetrack.yaml"
-    )
-
-    # 모터 이전 상태 변수 루프 밖으로 이동
-    prev_left = -1
-    prev_right = -1
-
-    # 잃어버린 시간 체크용 변수 (재탐색 로직용)
-    lost_time = 0
-
-    for result in results:
-        frame = result.orig_img
+class RobotTracker:
+    def __init__(self):
+        # 자율주행 상태 변수들 격리
+        self.current_state = "MANUAL"  
+        self.state_timer = 0          
+        self.lost_start_time = 0      
+        self.last_turn_dir = 1
+        self.prev_error = 0
+        self.detected_object = "NONE"
         
-        # [수정 1] 프레임 크기 가져오기를 루프 내부로 이동
-        frame_height, frame_width = frame.shape[:2]
-        frame_center = frame_width // 2
+        # 모터 속도 상태
+        self.motor_left = 0
+        self.motor_right = 0
 
-        boxes = result.boxes
-
-        # 객체가 하나도 없을 경우 (재탐색 로직 적용)
-        if boxes is None or len(boxes) == 0:
-            cv2.putText(frame, "NO DETECTION - SEARCHING", (50, 50), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            
-            # [고도화] 단순 정지가 아닌, 제자리 회전으로 주변 탐색
-            # 예: 양쪽 바퀴를 반대로 돌려 제자리 회전
-            left_speed, right_speed = -80, 80 
-            
-            if left_speed != prev_left or right_speed != prev_right:
-                set_motor_speed(left_speed, right_speed)
-                prev_left = left_speed
-                prev_right = right_speed
-
-            cv2.imshow("PetBot Tracking", frame)
-            if cv2.waitKey(1) == 27:
-                break
-            continue
-
-        # --- 이후 로직은 기존과 동일 (가장 큰 객체 선택 및 P-Control) ---
-        best_box = max(boxes, key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]))
-        x1, y1, x2, y2 = map(int, best_box.xyxy[0])
-        center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-        area = (x2 - x1) * (y2 - y1)
-
-        error = center_x - frame_center
-        control = Kp * error
-
-        if area < min_area:
-            forward_control = base_speed
-        elif area > max_area:
-            forward_control = 0
+    def process_yolo_and_control(self, frame, model_engine):
+        current_time = time.time()
+        
+        # 1. 이미지 리사이즈 및 YOLO 추론
+        small_frame = cv2.resize(frame, (416, 234))
+        results = model_engine.predict(small_frame, imgsz=416, conf=0.65, verbose=False)
+        boxes = results[0].boxes
+       
+        # 2. 타겟 인식 검사 (Dog, Cat)
+        if boxes is not None and len(boxes) > 0:
+            cls = int(boxes.cls[0].item())
+            target_name = results[0].names[cls]
+            if target_name in ["Dog", "Cat"]:
+                self.detected_object = target_name
+            else:
+                self.detected_object = "NONE"
         else:
-            forward_control = 80
+            self.detected_object = "NONE"
 
-        left_speed = int(max(-255, min(255, forward_control + control)))
-        right_speed = int(max(-255, min(255, forward_control - control)))
+        annotated_frame = frame.copy()
 
-        if left_speed != prev_left or right_speed != prev_right:
-            set_motor_speed(left_speed, right_speed)
-            prev_left = left_speed
-            prev_right = right_speed
+        # 3. 상태 머신 (State Machine) 제어
+        if self.current_state == "MANUAL":
+            pass
 
-        print(f"ERROR : {error}")
-        print(f"LEFT : {left_speed}")
-        print(f"Right : {right_speed}")
+        elif self.current_state == "EXPLORATION":
+            if self.detected_object != "NONE":
+                self.current_state = "TRACKING"
+                print("🎯 [STATE] EXPLORATION -> TRACKING (대상 발견)")
+            else:
+                action_elapsed = current_time - self.state_timer
+                if action_elapsed < 5.0:
+                    self.motor_left, self.motor_right = 120, 120
+                elif action_elapsed < 6.5:
+                    self.motor_left = -100 * self.last_turn_dir
+                    self.motor_right = 100 * self.last_turn_dir
+                else:
+                    self.state_timer = current_time
+                    self.last_turn_dir *= -1
+               
+                set_motor_speed(self.motor_left, self.motor_right)
+                cv2.putText(annotated_frame, "MODE: EXPLORATION (PATROL)", (20, 40), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
 
-        # 시각화
+        elif self.current_state == "TRACKING":
+            if self.detected_object == "NONE":
+                self.current_state = "RECOVERY"
+                self.lost_start_time = current_time
+                self.prev_error = 0
+                print("⚠️ [STATE] TRACKING -> RECOVERY (대상 유실)")
+            else:
+                best_box = max(boxes, key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]))
+                x1, y1, x2, y2 = map(int, best_box.xyxy[0])
+               
+                cv2.rectangle(annotated_frame, (x1*2, y1*2), (x2*2, y2*2), (0, 255, 0), 2)
+                cv2.putText(annotated_frame, f"TRACKING: {self.detected_object}", (x1*2, y1*2 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        # 객체 박스
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            (0, 255, 0),
-            2
-        )
+                frame_h = small_frame.shape[0]  
+                box_height = int(y2 - y1)
+                height_ratio = box_height / frame_h  
 
-        # 객체 중심점
-        cv2.circle(
-            frame,
-            (center_x, center_y),
-            5,
-            (0, 0, 255),
-            -1
-        )
+                center_x = (x1 + x2) // 2
+                frame_center = small_frame.shape[1] // 2  
+                error = center_x - frame_center
 
-        # 방향 표시
-        direction = get_direction(center_x, frame_center, deadzone=50)
+                if abs(error) < 20:
+                    error = 0
 
-        # 방향 텍스트 표시
-        cv2.putText(
-            frame,
-            direction,
-            (50, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2
-        )
+                # PID 제어 루프
+                Kp = 0.38  
+                Kd = 0.18  
 
-        # 중심 좌표 표시
-        cv2.putText(
-            frame,
-            f"X: {center_x}",
-            (50, 100),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 255),
-            2
-        )
+                derivative = error - self.prev_error
+                control = (Kp * error) + (Kd * derivative)
+                control = max(-60, min(60, control))
+                self.prev_error = error
 
-        # 바퀴 속도 표시
-        cv2.putText(
-            frame,
-            f"L:{left_speed} R:{right_speed}",
-            (50, 150),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 0),
-            2
-        )
-        
-        # =========================
-        # 로그 출력
-        # =========================
-        print("=" * 40)
-        print(f"DIRECTION : {direction}")
-        print(f"ERROR     : {error}")
-        print(f"AREA      : {area}")
-        print(f"LEFT      : {left_speed}")
-        print(f"RIGHT     : {right_speed}")
+                if height_ratio < 0.25:
+                    forward = 120
+                    distance_status = "FAR (APPROACH)"
+                elif height_ratio < 0.45:
+                    forward = 60
+                    distance_status = "MID (SLOW DOWN)"
+                elif height_ratio < 0.60:
+                    forward = 0
+                    distance_status = "ARRIVED (STOP)"
+                    if abs(error) < 40:
+                        control = 0
+                else:
+                    forward = -60
+                    distance_status = "TOO CLOSE (BACKUP)"
 
-        # ESC 키 종료
-        if cv2.waitKey(1) == 27:
-            break
+                left = int(max(-255, min(255, forward + control)))
+                right = int(max(-255, min(255, forward - control)))
 
-    # 종료
-    cv2.destroyAllWindows()
+                MIN_SPEED = 90
+               
+                if left != 0 and abs(left) < MIN_SPEED:
+                    left = MIN_SPEED if left > 0 else -MIN_SPEED
+                if right != 0 and abs(right) < MIN_SPEED:
+                    right = MIN_SPEED if right > 0 else -MIN_SPEED
+
+                self.motor_left, self.motor_right = left, right
+                set_motor_speed(self.motor_left, self.motor_right)
+
+                cv2.putText(annotated_frame, f"MODE: TRACKING ({distance_status})", (20, 40), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+        elif self.current_state == "RECOVERY":
+            if self.detected_object != "NONE":
+                self.current_state = "TRACKING"
+                print("🔄 [STATE] RECOVERY -> TRACKING (복구 성공)")
+            else:
+                lost_elapsed = current_time - self.lost_start_time
+                if lost_elapsed <= 5.0:
+                    self.motor_left, self.motor_right = -90, 90
+                    set_motor_speed(self.motor_left, self.motor_right)
+                    cv2.putText(annotated_frame, f"MODE: RECOVERY ({5.0 - lost_elapsed:.1f}s)", (20, 40), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                else:
+                    self.current_state = "EXPLORATION"
+                    self.state_timer = current_time  
+                    print("■ [STATE] RECOVERY -> EXPLORATION (복구 실패, 순찰 복귀)")
+
+        return annotated_frame
