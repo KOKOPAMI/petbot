@@ -1,0 +1,306 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #0d1117; /* 깊은 다크 블루/그레이 */
+    color: #c9d1d9;
+}
+
+/* 상단 헤더 */
+
+.header {
+    width: 100%;
+    padding: 20px;
+    background: #161b22;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: bold;
+    border-bottom: 1px solid #30363d;
+    text-align: center;
+}
+
+/* 전체 컨테이너 */
+
+.container{
+
+    padding:20px;
+}
+
+/* 카드 UI */
+
+.card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+}
+
+/* 상태 정보 */
+
+.status-row{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    margin-bottom:12px;
+
+    font-size:18px;
+}
+
+/* 버튼 영역 */
+
+.button-group{
+
+    display:flex;
+
+    gap:15px;
+
+    margin-top:20px;
+}
+
+/* 공통 버튼 */
+
+.btn{
+
+    flex:1;
+
+    height:60px;
+
+    border:none;
+
+    border-radius:18px;
+
+    font-size:18px;
+    font-weight:bold;
+
+    cursor:pointer;
+
+    transition:0.2s;
+}
+
+/* 버튼 눌림 효과 */
+
+.btn:active{
+    background: #30363d;
+    transform: scale(0.95);
+}
+
+/* 파란 버튼 */
+
+.btn-blue{
+
+    background:#4f7cff;
+
+    color:white;
+}
+
+/* 초록 버튼 */
+
+.btn-green{
+
+    background:#46c98f;
+
+    color:white;
+}
+
+/* 기준점 박스: 패딩을 없애고 자식 요소들이 이 박스 기준으로 겹치게 설정 */
+.video-box {
+    position: relative;
+    width: 100%;
+    background: #000000;
+    border-radius: 20px;
+    overflow: hidden;
+    padding: 0 !important; /* 영상에 딱 맞게 여백 제거 */
+}
+
+.hud-live {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.65); /* 영상이 보여야 하므로 반투명 블랙 */
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ff4d4d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 10; /* 비디오보다 무조건 위에 배치 */
+    border: 1px solid rgba(255, 77, 77, 0.2);
+    letter-spacing: 1px;
+}
+
+/* 빨간 점이 숨쉬듯 커졌다 작아지는 애니메이션 효과 */
+.live-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #ff4d4d;
+    border-radius: 50%;
+    display: inline-block;
+    animation: hudPulse 1.5s infinite;
+}
+
+@keyframes hudPulse {
+    0% { transform: scale(0.8); opacity: 0.4; }
+    50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px #ff4d4d; }
+    100% { transform: scale(0.8); opacity: 0.4; }
+}
+
+/* 2. 밀리터리 모서리 조준선 공통 스타일 */
+.hud-bracket {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border: 3px solid #00ff66; /* 드론/군용 장비 특유의 형광 초록 */
+    z-index: 5;
+    pointer-events: none; /* 중요: 마우스나 터치 클릭이 비디오를 가로막지 않게 방해 해제 */
+    filter: drop-shadow(0 0 4px #00ff66); /* 네온 불빛 효과 */
+}
+
+/* 각 테두리 선을 쳐서 ㄱ, ㄴ 모양의 모서리 괄호 만들기 */
+.top-left {
+    top: 20px; left: 20px;
+    border-right: none; border-bottom: none;
+}
+.top-right {
+    top: 20px; right: 20px;
+    border-left: none; border-bottom: none;
+}
+.bottom-left {
+    bottom: 20px; left: 20px;
+    border-right: none; border-top: none;
+}
+.bottom-right {
+    bottom: 20px; right: 20px;
+    border-left: none; border-top: none;
+}
+
+video{
+
+    width:100%;
+
+    max-width:640px;
+
+    height:auto;
+
+    border-radius:12px;
+
+    object-fit:contain;
+}
+
+/* 하단 네비게이션 */
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 70px;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+/* 네비 버튼 */
+
+.nav-item {
+    font-size: 13px;
+    color: #8b949e;
+}
+
+/* 조이스틱 버튼 */
+
+.control-pad{
+
+    margin-top:30px;
+
+    display:grid;
+
+    grid-template-columns:100px 100px 100px;
+
+    grid-template-rows:100px 100px 100px;
+
+    gap:15px;
+
+    justify-content:center;
+}
+
+/* 방향 버튼 */
+
+.control-btn {
+    width: 100px;
+    height: 100px;
+    border: 1px solid #30363d;
+    border-radius: 50%;
+    background: #21262d;
+    color: #ffffff;
+    font-size: 28px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+/* STOP 버튼 */
+
+.stop-btn{
+
+    background:#ff5b5b;
+
+    color:white;
+}
+
+/* 버튼 위치 */
+
+.forward{
+    grid-column:2;
+    grid-row:1;
+}
+
+.left{
+    grid-column:1;
+    grid-row:2;
+}
+
+.stop{
+    grid-column:2;
+    grid-row:2;
+}
+
+.right{
+    grid-column:3;
+    grid-row:2;
+}
+
+.back{
+    grid-column:2;
+    grid-row:3;
+}
+
+/* 모바일 대응 */
+
+@media(max-width:600px){
+
+    .header{
+
+        font-size:24px;
+    }
+
+    .status-row{
+
+        font-size:16px;
+    }
+
+    .btn{
+
+        font-size:16px;
+    }
+}

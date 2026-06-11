@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 모니터링</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="header">
+        실시간 모니터링
+    </div>
+
+    <div class="container">
+
+        <div class="video-box">
+            <div class="hud-live">
+                <span class="live-dot"></span> LIVE
+            </div>
+            
+            <div class="hud-bracket top-left"></div>
+            <div class="hud-bracket top-right"></div>
+            <div class="hud-bracket bottom-left"></div>
+            <div class="hud-bracket bottom-right"></div>
+
+            <video id="video" autoplay playsinline muted></video>
+        </div>
+
+        <div class="card">
+            <div class="status-row">
+                <span>상태</span>
+                <span style="color: #4CAF50; font-weight: bold;">실시간 LIVE</span>
+            </div>
+
+            <div class="status-row">
+                <span>감지 객체</span>
+                <span id="detected" style="color: #ff5722; font-weight: bold;">NONE</span>
+            </div>
+
+            <div class="status-row">
+                <span>온도</span>
+                <span id="temperature">24°C</span> 
+            </div>
+
+            <div class="status-row">
+                <span>모드</span>
+                <span id="mode" style="font-weight: bold;">MANUAL</span>
+            </div>
+
+            <div class="status-row">
+                <span>모터 속도 (L/R)</span>
+                <span id="motor">0 / 0</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="button-group" style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button id="micToggleBtn" onclick="initiateMicrophone()" style="width: 80%; max-width: 300px; padding: 12px 24px; font-size: 16px; background-color: #34495e; color: white; border: none; border-radius: 20px; font-weight: bold;">
+                    🎤 마이크 연동 시작
+                </button>
+                <p id="micInfoText" style="color: #95a5a6; font-size: 13px; margin: 0;">버튼을 누르면 마이크가 연동됩니다.</p>
+
+                <button class="btn btn-green" id="trackBtn" onclick="toggleTracking()" style="width: 80%; max-width: 300px; background: #ff5b5b; color: white; padding: 12px; border: none; border-radius: 20px; font-weight: bold; margin-top: 5px;">
+                    자동 추적 OFF
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="goHome()">🏠<br>홈</div>
+        <div class="nav-item">📹<br>모니터링</div>
+        <div class="nav-item" onclick="goControl()">🎮<br>제어</div>
+    </div>
+
+<script>
+// =========================
+// 페이지 이동
+// =========================
+function goHome(){
+    location.href = "/";
+}
+
+// 기존 경로 유지
+function goControl(){
+    location.href = "/control_page";
+}
+
+// =========================
+// AUTO TRACK (상태 동기화 로직 보완)
+// =========================
+let tracking = false;
+
+async function toggleTracking(){
+    try {
+        tracking = !tracking;
+        
+        await fetch("/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                command: tracking ? "AUTO_TRACK_ON" : "AUTO_TRACK_OFF"
+            })
+        });
+        
+        updateButtonUI(tracking);
+    } catch(e) {
+        console.error("추적 모드 제어 실패:", e);
+    }
+}
+
+function updateButtonUI(isTracking) {
+    const button = document.getElementById("trackBtn");
+    if (isTracking) {
+        button.innerText = "자동 추적 중지";
+        button.style.background = "#46c98f"; 
+    } else {
+        button.innerText = "자동 추적 시작";
+        button.style.background = "#ff5b5b"; 
+    }
+}
+
+// =========================
+// 실시간 갱신 (상태 데이터 연동 및 단일화)
+// =========================
+async function updateStatus(){
+    try {
+        const res = await fetch("/status");
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById("detected").innerText = data.detected;
+        document.getElementById("mode").innerText = data.mode;
+        document.getElementById("motor").innerText = `${data.left} / ${data.right}`;
+
+        tracking = (data.mode !== "MANUAL");
+        updateButtonUI(tracking);
+    } catch (e) {
+        console.error("상태 데이터 로드 실패:", e);
+    }
+}
+
+setInterval(updateStatus, 500);
+
+// ========================================================
+// 🛠️ [구조 개선] WebRTC 송수신 전면 재결합 시스템
+// ========================================================
+const video = document.getElementById("video");
+let pc = null;
+let localAudioStream = null;
+
+async function startWebRTC(enableAudio = false) {
+    // 1. 기존 연결 자원이 있다면 끊고 새로 갱신 (재협상 우회용 포트 재연결)
+    if (pc) {
+        pc.close();
+    }
+    
+    pc = new RTCPeerConnection({ iceServers: [] });
+
+    pc.ontrack = (event) => {
+        console.log("MONITOR PAGE: TRACK RECEIVED");
+        video.srcObject = event.streams[0];
+        video.play();
+    };
+
+    // 영상 트랙 항상 요청 수신 대기
+    pc.addTransceiver("video", { direction: "recvonly" });
+
+    // 2. 마이크 켜기 요청 시에만 오디오 트랙을 삽입하여 보냄
+    if (enableAudio) {
+        try {
+            localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
+        } catch (err) {
+            alert("아이폰 설정에 의해 마이크 권한이 거부되었습니다: " + err);
+            return false;
+        }
+    }
+
+    // 3. 백엔드 /offer 엔드포인트와 WebRTC 핸드셰이크 체결
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const response = await fetch("/offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            sdp: pc.localDescription.sdp,
+            type: pc.localDescription.type
+        })
+    });
+
+    const answer = await response.json();
+    await pc.setRemoteDescription(answer);
+    console.log(`MONITOR PAGE: WebRTC CONNECTED (Audio: ${enableAudio})`);
+    return true;
+}
+
+// 4. 마이크 버튼 제어 로직 함수
+async function initiateMicrophone() {
+    const micBtn = document.getElementById('micToggleBtn');
+    const micInfo = document.getElementById('micInfoText');
+
+    // 마이크 트랙 활성화 포함하여 WebRTC 재연결 프로세스 기동
+    const success = await startWebRTC(true);
+    
+    if (success) {
+        micBtn.innerText = "🟢 오디오 트랙 송출 완료";
+        micBtn.style.backgroundColor = "#2ecc71";
+        micBtn.disabled = true;
+        micInfo.innerText = "마이크 신호가 로봇 고속도로에 탑재되었습니다!";
+        micInfo.style.color = "#2ecc71";
+        console.log("🎙️ 오디오 스트림 결합 완료 및 재동기화 성공");
+    }
+}
+
+// 최초 구동 시에는 영상만 수신하도록 시작
+startWebRTC(false);
+</script>
+
+</body>
+</html>

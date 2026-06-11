@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>PetBot</title>
+
+    <!-- CSS 연결 -->
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+    <!-- 상단 헤더 -->
+    <div class="header">
+        PetBot
+    </div>
+
+    <!-- 전체 영역 -->
+    <div class="container">
+
+        <!-- 펫봇 상태 카드 -->
+        <div class="card">
+
+            <h2>PetBot 01</h2>
+
+            <br>
+
+            <div class="status-row">
+                <span>배터리</span>
+                <span id="battery">72%</span>
+            </div>
+
+            <div class="status-row">
+                <span>Wi-Fi</span>
+                <span id="wifi">연결됨</span>
+            </div>
+
+            <div class="status-row">
+                <span>상태</span>
+                <span id="status">ONLINE</span>
+
+                <span>모드</span>
+                <span id="mode">MANUAL</span>
+
+                <span>감지 객체</span>
+                <span id="detected">NONE</span>
+            </div>
+            
+
+        </div>
+
+        <!-- 버튼 영역 -->
+        <div class="card">
+
+            <h2>빠른 실행</h2>
+
+            <div class="button-group">
+
+                <!-- 실시간 보기 -->
+                <button class="btn btn-blue"
+                        onclick="goMonitor()">
+
+                    실시간 보기📷
+
+                </button>
+
+                <!-- 원격 제어 -->
+                <button class="btn btn-green"
+                        onclick="goControl()">
+
+                    원격 제어🕹️
+
+                </button>
+
+                <button
+                class="btn"
+
+                onclick="toggleTrack()">
+
+                AUTO TRACK
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- 하단 네비게이션 -->
+    <div class="bottom-nav">
+
+        <div class="nav-item">
+            🏠<br>
+            홈
+        </div>
+
+        <div class="nav-item"
+            onclick="goMonitor()">
+
+        📹<br>
+        모니터링
+
+        </div>
+
+        <div class="nav-item"
+            onclick="goControl()">
+
+        🎮<br>
+        제어
+
+        </div>
+        <div class="nav-item">
+            ⚙<br>
+            설정
+        </div>
+
+    </div>
+
+<script>
+
+// =========================
+// 페이지 이동
+// =========================
+
+function goMonitor(){
+location.href="/monitor";
+}
+
+function goControl(){
+location.href="/control_page";
+}
+
+// =========================
+// AUTO TRACK
+// =========================
+
+let tracking=false;
+
+async function toggleTrack(){
+
+tracking=!tracking;
+
+const response=
+await fetch(
+"/control",
+{
+method:"POST",
+
+headers:{
+"Content-Type":
+"application/json"
+},
+
+body:
+JSON.stringify({
+
+command:
+tracking
+?
+"AUTO_TRACK_ON"
+:
+"AUTO_TRACK_OFF"
+
+})
+
+}
+);
+
+console.log(
+await response.text()
+);
+
+}
+
+async function updateStatus(){
+
+const res=
+await fetch(
+"/status"
+);
+
+const data=
+await res.json();
+
+document
+.getElementById(
+"battery"
+)
+.innerText=
+data.battery+"%";
+
+document
+.getElementById(
+"wifi"
+)
+.innerText=
+data.wifi;
+
+document
+.getElementById(
+"status"
+)
+.innerText=
+data.state;
+
+document
+.getElementById(
+"mode"
+)
+.innerText=
+data.mode;
+
+document
+.getElementById(
+"detected"
+)
+.innerText=
+data.detected;
+
+}
+
+setInterval(
+updateStatus,
+1000
+);
+
+updateStatus();
+
+</script>
+
+</body>
+</html>
