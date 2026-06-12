@@ -7,6 +7,10 @@ import queue
 import time
 import threading
 import subprocess
+from aiohttp import web
+
+# 🌟 login.py 파일에서 안전하게 다중 사용자 인증 기능들을 가져옵니다.
+from login import init_db, auth_middleware, login_handler, register_handler
 
 # sensor.py 호출 및 센서 인스턴스 생성
 from sensor import TemperatureSensor
@@ -21,7 +25,6 @@ tracker = RobotTracker()
 # YOLO 모델 및 카메라 초기화
 # =================================================================
 from ultralytics import YOLO
-from aiohttp import web
 from aiortc import (
     RTCPeerConnection,
     RTCSessionDescription,
@@ -39,10 +42,13 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 cap.set(cv2.CAP_PROP_FPS, 20)
 
+# 서버 시작 시 login 모듈의 데이터베이스 초기화 및 테이블 생성 가동
+init_db()
+
 # =================================================================
-# 기존 글로벌 프레임 변수를 삭제하고, 스레드 안전한 비동기 큐로 대체합니다.
+# 스레드 안전한 비동기 큐 (최신 프레임 1개만 유지)
 # =================================================================
-frame_queue = asyncio.Queue(maxsize=1) # 💡 버퍼가 밀리지 않도록 최신 프레임 1개만 유지하는 큐
+frame_queue = asyncio.Queue(maxsize=1)
 
 battery = 82
 wifi = "CONNECTED"
@@ -62,23 +68,19 @@ shared_status_cache = {
 }
 
 # ==========================================
-# 백그라운드 스레드 및 루프 고도화 (병목 제거)
+# 백그라운드 스레드 및 루프 고도화
 # ==========================================
-
-# 1단계: 카메라는 오직 큐에 프레임을 집어넣는 일만 수행 (부하 최소화)
 def camera_reader_thread(loop):
     global is_running
     print("📸 [1단계] 카메라 버퍼 드레인 스레드 가동 완료")
     while is_running:
         ret, frame = cap.read()
         if ret:
-            # 메인 비동기 이벤트 루프 스레드에 안전하게 프레임 투척
             asyncio.run_coroutine_threadsafe(push_frame_to_queue(frame), loop)
         else:
             time.sleep(0.01)
 
 async def push_frame_to_queue(frame):
-    # 큐가 꽉 차 있으면 옛날 프레임은 버리고 최신 프레임으로 갈아끼움 (밀림 방지)
     if frame_queue.full():
         try:
             frame_queue.get_nowait()
@@ -86,17 +88,14 @@ async def push_frame_to_queue(frame):
             pass
     await frame_queue.put(frame)
 
-# 2단계: YOLO 루프는 큐에서 안전하게 프레임을 꺼내와 분석 (Deadlock 원천 차단)
 async def camera_inference_loop():
     global latest_annotated_frame, is_running, shared_status_cache
     print("✅ [2단계] 백그라운드 YOLO 분석 및 모터 제어 루프 가동 시작")
     
     while is_running:
         try:
-            # 큐에 최신 프레임이 들어올 때까지 비동기 대기 (CPU 소모 0%)
             current_frame = await frame_queue.get()
             
-            # 무거운 YOLO 연산은 별도 작업 스레드로 완전 격리
             annotated_frame = await asyncio.to_thread(
                 tracker.process_yolo_and_control, 
                 current_frame, 
@@ -106,7 +105,6 @@ async def camera_inference_loop():
             latest_annotated_frame = annotated_frame
             frame_queue.task_done()
 
-            # 상태 캐시 동기화
             shared_status_cache["detected"] = tracker.detected_object
             shared_status_cache["tracking"] = tracker.current_state != "MANUAL"
             shared_status_cache["mode"] = tracker.current_state
@@ -114,7 +112,6 @@ async def camera_inference_loop():
             shared_status_cache["right"] = tracker.motor_right
             shared_status_cache["pet_temp"] = round(sensor_driver.pet_temp, 1)
 
-            # 프레임 레이트 안정화를 위해 아주 미세한 휴식
             await asyncio.sleep(0.01)
 
         except asyncio.CancelledError:
@@ -123,7 +120,6 @@ async def camera_inference_loop():
             print(f"⚠️ YOLO 루프 내부 예외 발생: {e}")
             await asyncio.sleep(1)
 
-# 🧠 [추가] 1분마다 파이썬 메모리 찌꺼기를 강제 수거하여 멈춤 현상 차단
 async def memory_leak_cleaner_loop():
     import gc
     global is_running
@@ -165,9 +161,12 @@ async def style(request):
     with open("style.css", "r", encoding="utf-8") as f:
         return web.Response(text=f.read(), content_type="text/css")
 
+async def settings(request):
+    with open("settings.html", "r", encoding="utf-8") as f:
+        return web.Response(text=f.read(), content_type="text/html")
+
 async def control(request):
     global last_command
-
     data = await request.json()
     command = data.get("command", "STOP")
 
@@ -192,7 +191,6 @@ async def control(request):
     tracker.current_state = "MANUAL"      
     speed = 160
 
-    # 신규 화이트앱 전용 커맨드 동기화 매핑 (BACKWARD 추가 핸들링)
     if command == "FORWARD":
         tracker.motor_left, tracker.motor_right = speed, speed
     elif command == "BACK" or command == "BACKWARD":
@@ -207,8 +205,19 @@ async def control(request):
     set_motor_speed(tracker.motor_left, tracker.motor_right)
     return web.Response(text="OK")
 
-audio_queue = queue.Queue(maxsize=2)
+# 🚪 로그아웃 처리: 브라우저의 명찰 쿠키를 만료시켜 제거합니다.
+async def logout_handler(request):
+    response = web.Response(text="OK")
+    response.del_cookie("session_user")
+    return response
 
+# 💻 원격 재부팅 처리: 파이썬이 리눅스 시스템에 직접 sudo reboot 명령을 전송합니다.
+async def reboot_handler(request):
+    print("⚠️ [비상 경고] 설정 화면으로부터 원격 재부팅 명령을 수신했습니다!")
+    subprocess.Popen(["sudo", "reboot"])
+    return web.Response(text="REBOOTING")
+
+audio_queue = queue.Queue(maxsize=2)
 p = pyaudio.PyAudio()
 stream = p.open(format=pyaudio.paInt16, channels=1, rate=48000, output=True)
 resampler = av.AudioResampler(format='s16', layout='mono', rate=48000)
@@ -257,24 +266,19 @@ async def offer(request):
                 try:
                     frame = await track.recv()
                     resampled_frames = resampler.resample(frame)
-                    
                     for r_frame in resampled_frames:
                         audio_data = r_frame.to_ndarray().tobytes()
-                        
                         while audio_queue.qsize() > 0:
                             try:
                                 audio_queue.get_nowait()
                             except queue.Empty:
                                 break
-                        
                         audio_queue.put_nowait(audio_data)
-                    
                 except Exception as e:
                     print("마이크 연결 종료 또는 에러:", e)
                     break
 
     pc.addTrack(CameraTrack())
-    
     await pc.setRemoteDescription(offer_desc)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
@@ -289,22 +293,21 @@ async def offer(request):
 
 def get_current_wifi():
     try:
-        # cut 대신 파이썬 내부에서 문자열을 쪼개도록 안전하게 구조를 변경했습니다.
         cmd = "nmcli -t -f active,ssid dev wifi | egrep '^yes'"
         output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-        
-        # 'yes:와이파이이름' 형태로 나오므로 콜론(:) 기준으로 쪼갭니다.
         if ":" in output:
             return output.split(":")[1]
         return "Disconnected"
     except Exception:
-        return "Wi-Fi" # nmcli 명령어가 없는 환경이거나 에러 시 기본값 방어
+        return "Wi-Fi"
 
-# 💡 [초고속 버퍼 튜닝] 연산량 제로 구역화 체결
 async def get_status(request):
     global shared_status_cache
-    # 실시간으로 수집되는 실제 Wi-Fi 이름을 팅기지 않게 동기화
     shared_status_cache["wifi"] = get_current_wifi()
+    
+    # 🌟 [개인화 추가] 문지기가 request에 얹어준 현재 세션 유저 아이디를 캐시에 실어 보냅니다.
+    shared_status_cache["current_user"] = request.get('user', 'Guest')
+    
     return web.json_response(shared_status_cache)
 
 # ==========================================
@@ -314,10 +317,7 @@ async def start_background_tasks(app_context):
     sensor_driver.start_loop() 
     print("🌡️ [3단계] 실시간 체온 센서 하드웨어 루프 가동 완료")
 
-    # 현재 웹 서버가 구동 중인 메인 비동기 루프 주소를 획득합니다.
     current_loop = asyncio.get_running_loop()
-
-    # 카메라 스레드에 메인 루프 객체를 인자로 전달하여 가동
     t_cam = threading.Thread(target=camera_reader_thread, args=(current_loop,), daemon=True)
     t_cam.start()
 
@@ -332,15 +332,12 @@ async def cleanup_background_tasks(app_context):
 async def on_shutdown(app_context):
     global is_running
     print("🚨 로봇 관제 웹 서버 정지 절차에 진입합니다.")
-    
     is_running = False  
     time.sleep(0.2)
-    
     try:
         set_motor_speed(0, 0)
     except:
         pass
-        
     cap.release()
     sensor_driver.close() 
     
@@ -350,22 +347,33 @@ async def on_shutdown(app_context):
     pcs.clear()
     print("👋 자원 및 SPI 통신 자원 반납 정상 완료")
 
-app = web.Application()
+# 🌟 login.py의 철통 문지기 미들웨어를 사용하도록 지정합니다.
+app = web.Application(middlewares=[auth_middleware])
 app.on_startup.append(start_background_tasks)
 app.on_cleanup.append(cleanup_background_tasks)
 
+# 🌐 웹 페이지 서빙 라우팅 리스트 정리
 app.router.add_get("/", index)
 app.router.add_get("/monitor", monitor)
 app.router.add_get("/control_page", control_page)
+app.router.add_get("/settings", settings) 
 app.router.add_get("/style.css", style)
+
+# ⚡ 실시간 통신 및 기능 API 엔드포인트 매핑
 app.router.add_post("/offer", offer)
 app.router.add_post("/control", control)
 app.router.add_get("/status", get_status)
+
+# 🔑 login.py의 데이터 핸들러 함수들을 매핑합니다 (POST 보안 철저)
+app.router.add_post("/login", login_handler)
+app.router.add_post("/register", register_handler)
+app.router.add_post("/logout", logout_handler) 
+app.router.add_post("/reboot", reboot_handler) 
+
 app.on_shutdown.append(on_shutdown)
 
 if __name__ == "__main__":
     import ssl
-    
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain('cert.pem', 'key.pem')
 
