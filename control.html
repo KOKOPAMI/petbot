@@ -1,321 +1,175 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>원격 제어</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-    <div class="header">
-        원격 제어
-    </div>
-
-    <div class="container">
-
-        <div class="video-box">
-            <div class="hud-live">
-                <span class="live-dot"></span> LIVE
+    <div class="app-container">
+        
+        <div class="app-header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 20px; cursor: pointer;" onclick="goHome()">◀</span>
+                <h1 style="font-size: 18px; font-weight: 700;">원격 제어</h1>
             </div>
+            <div style="font-size: 20px; cursor: pointer;">⋮</div>
+        </div>
+
+        <div class="main-content">
             
-            <div class="hud-bracket top-left"></div>
-            <div class="hud-bracket top-right"></div>
-            <div class="hud-bracket bottom-left"></div>
-            <div class="hud-bracket bottom-right"></div>
-
-            <video id="video" autoplay playsinline muted></video>
-        </div>
-
-        <div class="card">
-            <div class="status-row">
-                <span>연결 상태</span>
-                <span id="robot-state" style="color: #4CAF50; font-weight: bold;">CONNECTING...</span>
-            </div>
-            <div class="status-row">
-                <span>배터리 / WiFi</span>
-                <span id="robot-battery">- % / -</span>
-            </div>
-            <div class="status-row">
-                <span>인식된 객체</span>
-                <span id="robot-detected" style="font-weight: bold; color: #ff5722;">NONE</span>
-            </div>
-            <div class="status-row">
-                <span>현재 모드</span>
-                <span id="robot-mode" style="font-weight: bold;">MANUAL</span>
-            </div>
-        </div>
-
-        <div class="card" id="pet-temp-card" style="transition: all 0.5s ease; border: 1px solid #30363d; padding: 15px; background: #161b22; border-radius: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span style="color: #8b949e; font-size: 13px;">🐾 반려동물 체온</span>
-                    <h2 id="pet-temp-display" style="margin: 5px 0 0 0; font-size: 28px; color: #ffffff;">--.- °C</h2>
+            <div class="video-wrapper">
+                <div class="video-overlay-hud">
+                    <span class="live-dot-green"></span> 실시간
                 </div>
-                <div id="temp-emoji" style="font-size: 32px; transition: transform 0.3s;">🌡️</div>
+                <div class="video-overlay-quality" id="top-battery-badge">🔋 72%</div>
+                <video id="video" autoplay playsinline muted></video>
+            </div>
+
+            <div class="joystick-container">
+                <div class="wheel-pad">
+                    <button class="wheel-btn btn-up" 
+                            onmousedown="sendDriveCmd('FORWARD')" ontouchstart="sendDriveCmd('FORWARD')"
+                            onmouseup="sendDriveCmd('STOP')" ontouchend="sendDriveCmd('STOP')">
+                        ▲<span>전진</span>
+                    </button>
+                    <button class="wheel-btn btn-down" 
+                            onmousedown="sendDriveCmd('BACKWARD')" ontouchstart="sendDriveCmd('BACKWARD')"
+                            onmouseup="sendDriveCmd('STOP')" ontouchend="sendDriveCmd('STOP')">
+                        <span>후진</span>▼
+                    </button>
+                    <button class="wheel-btn btn-left" 
+                            onmousedown="sendDriveCmd('LEFT')" ontouchstart="sendDriveCmd('LEFT')"
+                            onmouseup="sendDriveCmd('STOP')" ontouchend="sendDriveCmd('STOP')">
+                        ◀ <span>좌회전</span>
+                    </button>
+                    <button class="wheel-btn btn-right" 
+                            onmousedown="sendDriveCmd('RIGHT')" ontouchstart="sendDriveCmd('RIGHT')"
+                            onmouseup="sendDriveCmd('STOP')" ontouchend="sendDriveCmd('STOP')">
+                        <span>우회전</span> ▶
+                    </button>
+                    
+                    <div class="btn-center-stop" onclick="sendDriveCmd('STOP')">
+                        <div class="stop-icon"></div>
+                        정지
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-bottom-bar">
+                <button class="btn-emergency-stop" onclick="sendDriveCmd('EMERGENCY_STOP')">
+                    <span style="font-size: 16px;">⚠️</span>
+                    <span>긴급 정지</span>
+                </button>
+
+                <div class="speed-capsule">
+                    <button class="speed-step-btn" onclick="adjustSpeed('DOWN')">−</button>
+                    <div class="speed-label">
+                        <span>속도</span>
+                        <span id="speed-text" style="color: #3b82f6;">중간</span>
+                    </div>
+                    <button class="speed-step-btn" onclick="adjustSpeed('UP')">+</button>
+                </div>
+
+                <button class="btn-sub-action" onclick="alert('음성 송출이 준비되었습니다.')">
+                    <span style="font-size: 16px;">🔊</span>
+                    <span>음성</span>
+                </button>
+            </div>
+
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="goHome()">
+                <span class="icon">🏠</span>
+                <span>홈</span>
+            </div>
+            <div class="nav-item" onclick="location.href='/monitor'">
+                <span class="icon">📹</span>
+                <span>모니터링</span>
+            </div>
+            <div class="nav-item active">
+                <span class="icon">🎮</span>
+                <span>제어</span>
             </div>
         </div>
 
-        <div class="card" style="text-align: center;">
-            <button id="track-toggle-btn" class="control-btn" style="width: 80%; max-width: 300px; background-color: #2196F3; color: white; border-radius: 20px; padding: 12px; font-weight: bold;" onclick="toggleAutoTrack()">
-                🤖 AI 자율 추적 시작
-            </button>
-        </div>
-
-        <div class="card" style="text-align: center;">
-            <button id="mic-toggle-btn" class="control-btn" style="width: 80%; max-width: 300px; background-color: #34495e; color: white; border-radius: 20px; padding: 12px; font-weight: bold; border: none;" onclick="toggleMic()">
-                🎤 마이크 오디오 송출 시작
-            </button>
-        </div>
-
-        <div class="joystick-wrapper">
-            <div id="joystick-zone"></div>
-        </div>
-
-    </div>
-
-    <div class="bottom-nav">
-        <div class="nav-item" onclick="goHome()">🏠<br>홈</div>
-        <div class="nav-item" onclick="goMonitor()">📹<br>모니터링</div>
-        <div class="nav-item">🎮<br>제어</div>
     </div>
 
 <script>
-    let isAlertCooldown = false; 
+let currentSpeedLevel = 2; // 1: 느림, 2: 중간, 3: 빠름
+const speedMap = { 1: "느림", 2: "중간", 3: "빠름" };
 
-    document.addEventListener("DOMContentLoaded", () => {
-        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    console.log("알림 권한이 허용되었습니다.");
-                }
-            });
-        }
-    });
+function goHome(){ location.href = "/"; }
 
-function goHome(){
-    location.href = "/";
-}
-
-function goMonitor(){
-    location.href = "/monitor";
-}
-
-let lastCommand = "";
-let isAutoTracking = false;
-
-function sendCommand(command){
-    if(command === lastCommand) return;
-    lastCommand = command;
-
-    fetch("/control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command })
-    });
-}
-
-function toggleAutoTrack() {
-    const btn = document.getElementById("track-toggle-btn");
-    if (!isAutoTracking) {
-        sendCommand("AUTO_TRACK_ON");
-        isAutoTracking = true;
-        btn.innerText = "■ 자율 추적 중지";
-        btn.style.backgroundColor = "#e91e63"; 
-    } else {
-        sendCommand("AUTO_TRACK_OFF");
-        isAutoTracking = false;
-        btn.innerText = "🤖 AI 자율 추적 시작";
-        btn.style.backgroundColor = "#2196F3"; 
-    }
-}
-
-async function updateRobotStatus() {
+// 속도 스텝 가속 제어 로직
+async function adjustSpeed(direction) {
+    if (direction === 'UP' && currentSpeedLevel < 3) currentSpeedLevel++;
+    if (direction === 'DOWN' && currentSpeedLevel > 1) currentSpeedLevel--;
+    
+    document.getElementById("speed-text").innerText = speedMap[currentSpeedLevel];
+    
+    // 백엔드로 현재 셋팅된 속도 레벨 전송
     try {
-        const response = await fetch("/status");
-        if (!response.ok) return;
-        const data = await response.json(); 
+        await fetch("/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command: `SET_SPEED_${currentSpeedLevel}` })
+        });
+    } catch(e) { console.error("속도 조절 전송 실패:", e); }
+}
 
-        document.getElementById("robot-state").innerText = data.state;
-        document.getElementById("robot-state").style.color = "#4CAF50";
-        document.getElementById("robot-battery").innerText = `${data.battery}% / ${data.wifi}`;
-        document.getElementById("robot-detected").innerText = data.detected;
-        document.getElementById("robot-mode").innerText = data.mode;
-
-        isAutoTracking = (data.mode !== "MANUAL");
-        const btn = document.getElementById("track-toggle-btn");
-        if (isAutoTracking) {
-            btn.innerText = "■ 자율 추적 중지";
-            btn.style.backgroundColor = "#e91e63";
-        } else {
-            btn.innerText = "🤖 AI 자율 추적 시작";
-            btn.style.backgroundColor = "#2196F3";
-        }
-
-        const tempDisplay = document.getElementById("pet-temp-display");
-        const tempCard = document.getElementById("pet-temp-card");
-        const tempEmoji = document.getElementById("temp-emoji");
-        
-        if (data.pet_temp !== undefined) {
-            tempDisplay.innerText = `${data.pet_temp} °C`; 
-            const CRITICAL_TEMP = 39.5; 
-            
-            if (data.pet_temp >= CRITICAL_TEMP) {
-                tempCard.style.background = "#da3633"; 
-                tempCard.style.borderColor = "#ff4d4d";
-                tempEmoji.style.transform = "scale(1.3) rotate(15deg)";
-                
-                if (Notification.permission === "granted" && !isAlertCooldown) {
-                    new Notification("🚨 반려동물 고열 감지 경고", {
-                        body: `현재 아이의 체온이 ${data.pet_temp}°C 입니다! 즉시 상태를 확인해 주세요.`,
-                        tag: "pet-fever-alert",
-                        requireInteraction: true
-                    });
-                    if (navigator.vibrate) {
-                        navigator.vibrate([500, 200, 500, 200, 500]); 
-                    }
-                    isAlertCooldown = true;
-                    setTimeout(() => {
-                        isAlertCooldown = false;
-                        console.log("알림 쿨다운 해제");
-                    }, 30000); 
-                }
-            } else {
-                tempCard.style.background = "#161b22"; 
-                tempCard.style.borderColor = "#30363d";
-                tempEmoji.style.transform = "scale(1.0) rotate(0deg)";
-            }
-        }
-
+// 🔥 고속 조종 명령 API 싱크탱크
+async function sendDriveCmd(cmd) {
+    try {
+        await fetch("/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command: cmd })
+        });
     } catch (e) {
-        document.getElementById("robot-state").innerText = "OFFLINE";
-        document.getElementById("robot-state").style.color = "#f44336";
-        console.error("상태 업데이트 중 에러 발생:", e);
+        console.error("이동 명령 통신 실패:", e);
     }
 }
 
-setInterval(updateRobotStatus, 1000);
+// 상단 배터리 스탯 동기화 서브 루틴
+async function syncControlHeader() {
+    try {
+        const res = await fetch("/status");
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById("top-battery-badge").innerText = `🔋 ${data.battery}%`;
+        }
+    } catch(e){}
+}
+setInterval(syncControlHeader, 3000);
 
-// ========================================================
-// 🛠️ [버그 수정 완료] WebRTC 송수신 전면 재결합 시스템
-// ========================================================
+// WebRTC 스트리밍 엔진 바인딩
 const video = document.getElementById("video");
 let pc = null;
-let localAudioStream = null;
 
-async function startWebRTC(enableAudio = false) {
-    if (pc) {
-        pc.close(); // 기존 커넥션 초기화 소멸
-    }
-    
+async function startControlWebRTC() {
     pc = new RTCPeerConnection({ iceServers: [] });
-
     pc.ontrack = (event) => {
-        console.log("CONTROL PAGE: TRACK RECEIVED");
         video.srcObject = event.streams[0];
+        video.play();
     };
-
-    // 영상 수신 트랙은 항상 등록
     pc.addTransceiver("video", { direction: "recvonly" });
 
-    // 마이크 연동 활성화 시 오디오 스트림 결합 후 송신 등록
-    if (enableAudio) {
-        try {
-            localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
-        } catch (err) {
-            alert("마이크 권한 획득에 실패했습니다: " + err);
-            return false;
-        }
-    }
-
-    // 젯슨 나노 백엔드 서버와 동기화 체결
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
     const response = await fetch("/offer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            sdp: pc.localDescription.sdp,
-            type: pc.localDescription.type
-        })
+        body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
     });
-
     const answer = await response.json();
     await pc.setRemoteDescription(answer);
-    console.log(`CONTROL PAGE: WebRTC CONNECTED (Audio Active: ${enableAudio})`);
-    return true;
 }
-
-// 마이크 버튼 온/오프 제어 함수
-async function toggleMic() {
-    const btn = document.getElementById("mic-toggle-btn");
-    
-    if (btn.classList.contains("active")) {
-        // 마이크 끄기
-        if (localAudioStream) {
-            localAudioStream.getTracks().forEach(track => track.stop());
-            localAudioStream = null;
-        }
-        btn.innerText = "🎤 마이크 오디오 송출 시작";
-        btn.style.backgroundColor = "#34495e";
-        btn.classList.remove("active");
-        await startWebRTC(false); // 오디오 제외하고 순수 영상만 다시 연결
-    } else {
-        // 마이크 켜기
-        const success = await startWebRTC(true); // 오디오 포함하여 새로 동기화 재연결
-        if (success) {
-            btn.innerText = "🟢 마이크 송출 중 (클릭 시 중지)";
-            btn.style.backgroundColor = "#2ecc71";
-            btn.classList.add("active");
-        }
-    }
-}
-
-// 페이지 로드 시 기본적으로 영상만 나오도록 초기 실행
-startWebRTC(false);
+startControlWebRTC();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
-<script>
-    const joystickZone = document.getElementById('joystick-zone');
-    
-    const options = {
-        zone: joystickZone,
-        mode: 'static',
-        position: { left: '50%', top: '50%' },
-        color: '#00e5ff',
-        size: 150
-    };
-
-    const manager = nipplejs.create(options);
-    let lastSentJoystickCommand = "STOP";
-
-    manager.on('move', function (evt, data) {
-        if (!data.direction) return;
-
-        const direction = data.direction.angle; 
-        let command = "STOP";
-
-        if (direction === 'up') command = "FORWARD";
-        else if (direction === 'down') command = "BACK";
-        else if (direction === 'left') command = "LEFT";
-        else if (direction === 'right') command = "RIGHT";
-
-        if (command !== lastSentJoystickCommand) {
-            // 💡 기존에 정의되어 있는 sendCommand 함수를 그대로 호출해 줍니다!
-            sendCommand(command);
-            lastSentJoystickCommand = command;
-        }
-    });
-
-    manager.on('end', function () {
-        sendCommand("STOP");
-        lastSentJoystickCommand = "STOP";
-    });
-</script>
-
 </body>
 </html>

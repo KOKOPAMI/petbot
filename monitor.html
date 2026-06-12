@@ -1,308 +1,276 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>실시간 모니터링</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-    <div class="header">
-        실시간 모니터링
-    </div>
-
-    <div class="container">
-
-        <div class="video-box">
-            <div class="hud-live">
-                <span class="live-dot"></span> LIVE
+    <div class="app-container">
+        
+        <div class="app-header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 20px; cursor: pointer;" onclick="goHome()">◀</span>
+                <h1 style="font-size: 18px; font-weight: 700;">실시간 모니터링</h1>
             </div>
+            <div style="font-size: 20px; cursor: pointer;">⋮</div>
+        </div>
+
+        <div class="main-content">
             
-            <div class="hud-bracket top-left"></div>
-            <div class="hud-bracket top-right"></div>
-            <div class="hud-bracket bottom-left"></div>
-            <div class="hud-bracket bottom-right"></div>
-
-            <video id="video" autoplay playsinline muted></video>
-        </div>
-
-        <div class="card">
-            <div class="status-row">
-                <span>상태</span>
-                <span style="color: #4CAF50; font-weight: bold;">실시간 LIVE</span>
+            <div class="video-wrapper">
+                <div class="video-overlay-hud">
+                    <span class="live-dot-green"></span> 실시간
+                </div>
+                <div class="video-overlay-quality">HD 📶</div>
+                <video id="video" autoplay playsinline muted></video>
             </div>
 
-            <div class="status-row">
-                <span>감지 객체</span>
-                <span id="detected" style="color: #ff5722; font-weight: bold;">NONE</span>
+            <div class="status-grid-2cell">
+                <div class="monitor-status-card">
+                    <span class="label">추적 상태</span>
+                    <div>
+                        <div class="value-box">
+                            <span style="font-size: 20px;">🎯</span>
+                            <span class="value" id="mode-text" style="color: #8b5cf6;">수동 제어</span>
+                        </div>
+                        <p class="sub-text" id="detected-sub">감지: NONE</p>
+                    </div>
+                </div>
+
+                <div class="monitor-status-card" id="temp-card-container">
+                    <span class="label">반려동물 체온</span>
+                    <div>
+                        <div class="value-box">
+                            <span style="font-size: 20px;">🌡️</span>
+                            <span class="value" id="pet-temp-display">--.- °C</span>
+                        </div>
+                        <p class="sub-text" id="temp-sub-text">정상 체온 범위</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="sensor-card">
-                <span>🐾 반려동물 체온</span>
-                <h2 id="pet-temp-display">--.- °C</h2>
+            <div class="app-card" style="padding: 14px 20px; margin-bottom: 25px; justify-content: space-between; font-size: 14px; color: #4e5561;">
+                <span>모터 구동 상태 (L/R)</span>
+                <span id="motor-text" style="font-weight: 700; color: #111;">0 / 0 RPM</span>
             </div>
 
-            <div class="status-row">
-                <span>모드</span>
-                <span id="mode" style="font-weight: bold;">MANUAL</span>
-            </div>
-
-            <div class="status-row">
-                <span>모터 속도 (L/R)</span>
-                <span id="motor">0 / 0</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="button-group" style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-                <button id="micToggleBtn" onclick="initiateMicrophone()" style="width: 80%; max-width: 300px; padding: 12px 24px; font-size: 16px; background-color: #34495e; color: white; border: none; border-radius: 20px; font-weight: bold;">
-                    🎤 마이크 연동 시작
+            <div class="action-grid">
+                <button class="action-bar-btn btn-action-blue" id="micToggleBtn" onclick="initiateMicrophone()">
+                    <span>🎤</span> <span id="mic-btn-text">음성 송출 시작</span>
                 </button>
-                <p id="micInfoText" style="color: #95a5a6; font-size: 13px; margin: 0;">버튼을 누르면 마이크가 연동됩니다.</p>
-
-                <button class="btn btn-green" id="trackBtn" onclick="toggleTracking()" style="width: 80%; max-width: 300px; background: #ff5b5b; color: white; padding: 12px; border: none; border-radius: 20px; font-weight: bold; margin-top: 5px;">
-                    자동 추적 OFF
+                
+                <button class="action-bar-btn btn-action-purple" id="trackBtn" onclick="toggleTracking()">
+                    <span>🧭</span> <span id="track-btn-text">자동 추적 ON</span>
                 </button>
+            </div>
+
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="goHome()">
+                <span class="icon">🏠</span>
+                <span>홈</span>
+            </div>
+            <div class="nav-item active">
+                <span class="icon">📹</span>
+                <span>모니터링</span>
+            </div>
+            <div class="nav-item" onclick="goControl()">
+                <span class="icon">🎮</span>
+                <span>제어</span>
             </div>
         </div>
 
-    </div>
-
-    <div class="bottom-nav">
-        <div class="nav-item" onclick="goHome()">🏠<br>홈</div>
-        <div class="nav-item">📹<br>모니터링</div>
-        <div class="nav-item" onclick="goControl()">🎮<br>제어</div>
     </div>
 
 <script>
-
-// ========================================================
-// 🚨 [보안 우회] 서비스 워커 등록 및 권한 자동 요청 구역
-// ========================================================
 let swRegistration = null;
+let tracking = false;
+let isAlertCooldown = false;
 
+// 1. 초기 로드 시 알림 권한 획득 및 서비스 워커(크롬 튕김 우회) 세팅
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. 브라우저 푸시 알림 권한 기본 요청
     if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                console.log("🏅 모니터링 화면 알림 권한 허용 완료");
-            }
-        });
+        Notification.requestPermission();
     }
 
-    // 2. 🔥 모바일 크롬이 설정창으로 강제 튕기는 것을 막는 가상 서비스 워커 로드
     if ('serviceWorker' in navigator) {
-        // 비어있는 가상 서비스 워커 스크립트를 인라인으로 등록하여 브라우저 포커스 강제 체결
         navigator.serviceWorker.register("data:text/javascript,self.addEventListener('notificationclick', function(e) { e.notification.close(); e.waitUntil(clients.matchAll({type: 'window'}).then(function(clientList) { for (var i = 0; i < clientList.length; i++) { var client = clientList[i]; if ('focus' in client) return client.focus(); } if (clients.openWindow) return clients.openWindow('/'); })); });")
-        .then(reg => {
-            swRegistration = reg;
-            console.log("🚀 크롬 설정창 튕김 우회 전용 가상 서비스 워커 바인딩 성공");
-        }).catch(err => console.error("서비스 워커 등록 실패:", err));
+        .then(reg => { swRegistration = reg; })
+        .catch(err => console.error("서비스 워커 로드 실패:", err));
     }
 });
 
-// =========================
-// 페이지 이동
-// =========================
-function goHome(){
-    location.href = "/";
-}
+function goHome(){ location.href = "/"; }
+function goControl(){ location.href = "/control_page"; }
 
-// 기존 경로 유지
-function goControl(){
-    location.href = "/control_page";
-}
-
-// =========================
-// AUTO TRACK (상태 동기화 로직 보완)
-// =========================
-let tracking = false;
-let isAlertCooldown = false; // 💡 [추가] 알림이 30초에 한 번만 가도록 제어하는 방패 변수
-
+// 2. 자동 추적 제어 POST 통신 핸들러
 async function toggleTracking(){
     try {
         tracking = !tracking;
-        
         await fetch("/control", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                command: tracking ? "AUTO_TRACK_ON" : "AUTO_TRACK_OFF"
-            })
+            body: JSON.stringify({ command: tracking ? "AUTO_TRACK_ON" : "AUTO_TRACK_OFF" })
         });
-        
         updateButtonUI(tracking);
     } catch(e) {
-        console.error("추적 모드 제어 실패:", e);
+        console.error("추적 스위치 통신 실패:", e);
     }
 }
 
 function updateButtonUI(isTracking) {
-    const button = document.getElementById("trackBtn");
+    const btnText = document.getElementById("track-btn-text");
+    const modeText = document.getElementById("mode-text");
     if (isTracking) {
-        button.innerText = "자동 추적 중지";
-        button.style.background = "#46c98f"; 
+        btnText.innerText = "자동 추적 OFF";
+        modeText.innerText = "자동 추적 중";
+        modeText.style.color = "#46c98f";
     } else {
-        button.innerText = "자동 추적 시작";
-        button.style.background = "#ff5b5b"; 
+        btnText.innerText = "자동 추적 ON";
+        modeText.innerText = "수동 제어";
+        modeText.style.color = "#8b5cf6";
     }
 }
 
-// ========================================================
-// 실시간 갱신 (상태 데이터 연동 및 단일화)
-// ========================================================
+// 3. 🔥 [동기화 고도화] 1초 주기 상태 동기화 및 홈 화면 알림 연동 엔진
 async function updateStatus(){
     try {
         const res = await fetch("/status");
         if (!res.ok) return;
         const data = await res.json();
 
-        // 1. 기본 데이터 갱신
-        document.getElementById("detected").innerText = data.detected;
-        document.getElementById("mode").innerText = data.mode;
-        document.getElementById("motor").innerText = `${data.left} / ${data.right}`;
+        // 기본 텍스트 필드 매핑
+        document.getElementById("detected-sub").innerText = `감지: ${data.detected}`;
+        document.getElementById("motor-text").innerText = `${data.left} / ${data.right} RPM`;
 
-        // 2. 펫봇 실시간 체온 연동 및 고열 푸시 알림 로직
         const tempDisplay = document.getElementById("pet-temp-display");
+        const tempCard = document.getElementById("temp-card-container");
+        const tempSub = document.getElementById("temp-sub-text");
+
         if (tempDisplay && data.pet_temp !== undefined) {
             tempDisplay.innerText = `${data.pet_temp} °C`;
             
-            const CRITICAL_TEMP = 39.5; // 위험 기준 온도
+            const CRITICAL_TEMP = 39.5; // 고열 기준 임계치
             
             if (data.pet_temp >= CRITICAL_TEMP) {
-                tempDisplay.style.color = "#ff4d4d"; // 텍스트 빨간색 변경
-                tempDisplay.style.fontWeight = "bold";
+                // UI를 즉시 경고 레이아웃(레드 톤)으로 반전시킵니다.
+                tempDisplay.style.color = "#ff4d4d";
+                tempSub.innerText = "🚨 고열 감지! 위험 상황";
+                tempSub.style.color = "#ff4d4d";
+                tempCard.style.background = "#fdeded";
                 
-                // 알림 권한이 있고 쿨다운 가드가 풀렸을 때 실행
-                if (Notification.permission === "granted" && !isAlertCooldown) {
+                // 30초 쿨다운 타이머가 해제되었을 때만 물리적 알림 작동 및 DB 저장
+                if (!isAlertCooldown) {
                     
-                    const notificationOptions = {
-                        body: `현재 아이의 체온이 ${data.pet_temp}°C 입니다! 즉시 상태를 확인해 주세요.`,
+                    // 🌟 A. 홈 화면 [알림 내역 모달함]으로 타임스탬프 데이터 동시 박제
+                    let currentLogs = JSON.parse(localStorage.getItem("pet_fever_logs")) || [];
+                    const now = new Date();
+                    const timeString = `${now.getMonth()+1}월 ${now.getDate()}일 ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+                    
+                    currentLogs.unshift({
+                        id: Date.now(),
+                        title: "🚨 [모니터링] 반려동물 고열 감지 경고",
+                        body: `아이의 체온이 ${data.pet_temp}°C 로 계측되었습니다.`,
+                        time: timeString
+                    });
+                    localStorage.setItem("pet_fever_logs", JSON.stringify(currentLogs));
+
+                    // B. 스마트폰 상단 푸시 알림 런처 기동
+                    const alertOptions = {
+                        body: `현재 아이의 체온이 ${data.pet_temp}°C 입니다! 즉시 관제가 필요합니다.`,
                         tag: "pet-fever-alert-monitor",
-                        requireInteraction: true // 사용자가 닫기 전까지 화면 고정
+                        requireInteraction: true
                     };
 
-                    // 💡 [핵심 수정] 서비스 워커가 준비되었다면 시스템 레벨 푸시로 우회 발송
-                    if (swRegistration) {
-                        swRegistration.showNotification("🚨 [모니터링] 반려동물 고열 감지 경고", notificationOptions);
-                    } else {
-                        // 서비스 워커 로드가 덜 되었을 때를 대비한 백업용 기존 알림
-                        const feverAlert = new Notification("🚨 [모니터링] 반려동물 고열 감지 경고", notificationOptions);
-                        feverAlert.onclick = function(event) {
-                            event.preventDefault();
-                            window.focus();
-                            feverAlert.close();
-                        };
+                    if (Notification.permission === "granted") {
+                        if (swRegistration) {
+                            swRegistration.showNotification("🚨 반려동물 고열 감지 경고", alertOptions);
+                        } else {
+                            const fallbackAlert = new Notification("🚨 반려동물 고열 감지 경고", alertOptions);
+                            fallbackAlert.onclick = function() { window.focus(); fallbackAlert.close(); };
+                        }
                     }
                     
-                    // 스마트폰 진동 효과
-                    if (navigator.vibrate) {
-                        navigator.vibrate([500, 200, 500, 200, 500]); 
-                    }
+                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
                     
-                    // 알림 중복 폭탄 방지 가드 가동 (30초 동결)
+                    // 중복 알림 도배 차단용 안전 가드 락 (30초간 동결)
                     isAlertCooldown = true;
-                    setTimeout(() => {
-                        isAlertCooldown = false;
-                        console.log("모니터링 화면 알림 쿨다운 해제");
-                    }, 30000); 
+                    setTimeout(() => { isAlertCooldown = false; }, 30000);
                 }
             } else {
-                tempDisplay.style.color = "#ffffff"; // 정상 온도일 때는 흰색
-                tempDisplay.style.fontWeight = "normal";
+                // 정상 온도로 복구 시 UI 초기화
+                tempDisplay.style.color = "#111111";
+                tempSub.innerText = "🐾 정상 체온 범위";
+                tempSub.style.color = "#b0b5c0";
+                tempCard.style.background = "#ffffff";
             }
         }
 
-        // 기존 자율주행 모드 동기화 유지
+        // 젯슨 서버 주행 모드와 프론트 버튼 UI 강제 동기화
         tracking = (data.mode !== "MANUAL");
         updateButtonUI(tracking);
     } catch (e) {
-        console.error("상태 데이터 로드 실패:", e);
+        console.error("실시간 모니터링 스탯 동기화 에러:", e);
     }
 }
+// 💡 서버 멈춤 부하를 완화하기 위해 기존 0.5초에서 1초(1000ms) 주기로 안정화 세팅
+setInterval(updateStatus, 1000);
 
-// 기존 주기 세팅 (0.5초마다 갱신)
-setInterval(updateStatus, 500);
-
-// ========================================================
-// 🛠️ [구조 개선] WebRTC 송수신 전면 재결합 시스템
-// ========================================================
+// 4. WebRTC 오디오/비디오 스트리밍 송수신 자원 바인딩
 const video = document.getElementById("video");
 let pc = null;
 let localAudioStream = null;
 
 async function startWebRTC(enableAudio = false) {
-    // 1. 기존 연결 자원이 있다면 끊고 새로 갱신 (재협상 우회용 포트 재연결)
-    if (pc) {
-        pc.close();
-    }
-    
+    if (pc) pc.close();
     pc = new RTCPeerConnection({ iceServers: [] });
 
     pc.ontrack = (event) => {
-        console.log("MONITOR PAGE: TRACK RECEIVED");
         video.srcObject = event.streams[0];
         video.play();
     };
-
-    // 영상 트랙 항상 요청 수신 대기
     pc.addTransceiver("video", { direction: "recvonly" });
 
-    // 2. 마이크 켜기 요청 시에만 오디오 트랙을 삽입하여 보냄
     if (enableAudio) {
         try {
             localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
         } catch (err) {
-            alert("아이폰 설정에 의해 마이크 권한이 거부되었습니다: " + err);
+            alert("마이크 권한 획득 실패: " + err);
             return false;
         }
     }
 
-    // 3. 백엔드 /offer 엔드포인트와 WebRTC 핸드셰이크 체결
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
     const response = await fetch("/offer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            sdp: pc.localDescription.sdp,
-            type: pc.localDescription.type
-        })
+        body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
     });
 
     const answer = await response.json();
     await pc.setRemoteDescription(answer);
-    console.log(`MONITOR PAGE: WebRTC CONNECTED (Audio: ${enableAudio})`);
     return true;
 }
 
-// 4. 마이크 버튼 제어 로직 함수
 async function initiateMicrophone() {
     const micBtn = document.getElementById('micToggleBtn');
-    const micInfo = document.getElementById('micInfoText');
-
-    // 마이크 트랙 활성화 포함하여 WebRTC 재연결 프로세스 기동
     const success = await startWebRTC(true);
-    
     if (success) {
-        micBtn.innerText = "🟢 오디오 트랙 송출 완료";
-        micBtn.style.backgroundColor = "#2ecc71";
+        micBtn.innerText = "🟢 오디오 송출 중";
+        micBtn.style.backgroundColor = "#26aa5c";
         micBtn.disabled = true;
-        micInfo.innerText = "마이크 신호가 로봇 고속도로에 탑재되었습니다!";
-        micInfo.style.color = "#2ecc71";
-        console.log("🎙️ 오디오 스트림 결합 완료 및 재동기화 성공");
     }
 }
 
-// 최초 구동 시에는 영상만 수신하도록 시작
+// 최초 화면 진입 시 영상 스트림만 자동 수신 시작
 startWebRTC(false);
 </script>
-
 </body>
 </html>

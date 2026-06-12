@@ -1,240 +1,214 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>PetBot</title>
-
-    <!-- CSS 연결 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PetBot 홈</title>
     <link rel="stylesheet" href="style.css">
-
 </head>
-
 <body>
 
-    <!-- 상단 헤더 -->
-    <div class="header">
-        PetBot
+    <div class="app-container">
+        
+        <div class="app-header">
+            <div class="app-title-box">
+                <h1>PetBot</h1>
+                <p>우리 집 감시 로봇</p>
+            </div>
+            <div class="noti-icon" onclick="openNotificationModal()">
+                🔔<span class="noti-dot" id="header-noti-dot" style="display:none;"></span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            
+            <div class="app-card">
+                <div class="robot-profile">
+                    <div class="robot-img-box">
+                        <span style="font-size: 55px;">🤖</span>
+                    </div>
+                    <div class="robot-info-box">
+                        <div class="robot-meta-row">
+                            <span class="robot-name">PetBot 01</span>
+                            <span class="status-badge" id="robot-state">ONLINE</span>
+                        </div>
+                        <hr style="border: 0; height: 1px; background: #eaeaea; margin: 2px 0;">
+                        <div class="robot-meta-row">
+                            <span>배터리</span>
+                            <div class="battery-bar-wrapper">
+                                🔋 <span id="robot-battery">72%</span>
+                            </div>
+                        </div>
+                        <div class="robot-meta-row">
+                            <span>연결 상태</span>
+                            <span id="robot-wifi" style="font-weight: 600; color: #4e5561;">Wi-Fi</span>
+                        </div>
+                        <div class="robot-meta-row">
+                            <span>클라우드</span>
+                            <span style="color: #3b82f6; font-weight: 600;">☁️ 연결됨</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">빠른 실행</h2>
+            <div class="quick-grid">
+                <button class="quick-btn btn-blue" onclick="location.href='/monitor'">
+                    <span class="icon">📹</span>
+                    <span>실시간 보기</span>
+                </button>
+                <button class="quick-btn btn-green" onclick="location.href='/control_page'">
+                    <span class="icon">🕹️</span>
+                    <span>원격 제어</span>
+                </button>
+            </div>
+
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item active">
+                <span class="icon">🏠</span>
+                <span>홈</span>
+            </div>
+            <div class="nav-item" onclick="location.href='/monitor'">
+                <span class="icon">📹</span>
+                <span>모니터링</span>
+            </div>
+            <div class="nav-item" onclick="openNotificationModal()">
+                <span class="icon">🔔</span>
+                <span>알림</span>
+            </div>
+            <div class="nav-item">
+                <span class="icon">⚙️</span>
+                <span>설정</span>
+            </div>
+        </div>
+
     </div>
 
-    <!-- 전체 영역 -->
-    <div class="container">
-
-        <!-- 펫봇 상태 카드 -->
-        <div class="card">
-
-            <h2>PetBot 01</h2>
-
-            <br>
-
-            <div class="status-row">
-                <span>배터리</span>
-                <span id="battery">72%</span>
-            </div>
-
-            <div class="status-row">
-                <span>Wi-Fi</span>
-                <span id="wifi">연결됨</span>
-            </div>
-
-            <div class="status-row">
-                <span>상태</span>
-                <span id="status">ONLINE</span>
-
-                <span>모드</span>
-                <span id="mode">MANUAL</span>
-
-                <span>감지 객체</span>
-                <span id="detected">NONE</span>
+    <div class="modal-overlay" id="notiModal" onclick="closeNotificationModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>알림 기록</h2>
+                <span class="modal-close-btn" onclick="closeNotificationModal()">✕</span>
             </div>
             
+            <div class="history-list" id="history-container">
+                </div>
 
+            <button class="clear-history-btn" onclick="clearAllHistory()">전체 기록 삭제</button>
         </div>
-
-        <!-- 버튼 영역 -->
-        <div class="card">
-
-            <h2>빠른 실행</h2>
-
-            <div class="button-group">
-
-                <!-- 실시간 보기 -->
-                <button class="btn btn-blue"
-                        onclick="goMonitor()">
-
-                    실시간 보기📷
-
-                </button>
-
-                <!-- 원격 제어 -->
-                <button class="btn btn-green"
-                        onclick="goControl()">
-
-                    원격 제어🕹️
-
-                </button>
-
-                <button
-                class="btn"
-
-                onclick="toggleTrack()">
-
-                AUTO TRACK
-
-                </button>
-
-            </div>
-
-        </div>
-
     </div>
 
-    <!-- 하단 네비게이션 -->
-    <div class="bottom-nav">
+    <script>
+        // 1. 서버 상태 주기적 브리핑 함수
+        async function fetchRobotSystemStatus() {
+            try {
+                const response = await fetch("/status");
+                if (!response.ok) return;
+                const data = await response.json();
 
-        <div class="nav-item">
-            🏠<br>
-            홈
-        </div>
+                document.getElementById("robot-state").innerText = data.state;
+                document.getElementById("robot-battery").innerText = `${data.battery}%`;
+                document.getElementById("robot-wifi").innerText = data.wifi;
 
-        <div class="nav-item"
-            onclick="goMonitor()">
+                const stateBadge = document.getElementById("robot-state");
+                if (data.state === "ONLINE") {
+                    stateBadge.style.background = "#e6f7ed";
+                    stateBadge.style.color = "#26aa5c";
+                } else {
+                    stateBadge.style.background = "#fdeded";
+                    stateBadge.style.color = "#ff5b5b";
+                }
 
-        📹<br>
-        모니터링
+                // 🔥 [홈 화면 자체 가드] 만약 모니터링 페이지를 안 켜고 홈에만 있더라도 고열을 감지하면 기록을 추가합니다.
+                if (data.pet_temp && data.pet_temp >= 39.5) {
+                    saveFeverAlertRecord(data.pet_temp);
+                }
 
-        </div>
+            } catch (e) {
+                document.getElementById("robot-state").innerText = "OFFLINE";
+                document.getElementById("robot-state").style.background = "#fdeded";
+                document.getElementById("robot-state").style.color = "#ff5b5b";
+            }
+        }
 
-        <div class="nav-item"
-            onclick="goControl()">
+        // 2. 고열 알림 발생 시 로컬스토리지에 시간과 함께 박제하는 함수 (중복 30초 쿨다운 보장)
+        let homeAlertCooldown = false;
+        function saveFeverAlertRecord(temp) {
+            if (homeAlertCooldown) return;
+            
+            homeAlertCooldown = true;
+            setTimeout(() => { homeAlertCooldown = false; }, 30000); // 30초 쿨다운 가드
 
-        🎮<br>
-        제어
+            // 기존 기록 가져오기
+            let currentLogs = JSON.parse(localStorage.getItem("pet_fever_logs")) || [];
+            
+            // 새 기록 생성
+            const now = new Date();
+            const timeString = `${now.getMonth()+1}월 ${now.getDate()}일 ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+            
+            const newLog = {
+                id: Date.now(),
+                title: "🚨 반려동물 고열 감지 경고",
+                body: `아이의 체온이 ${temp}°C 로 계측되었습니다.`,
+                time: timeString
+            };
 
-        </div>
-        <div class="nav-item">
-            ⚙<br>
-            설정
-        </div>
+            // 최신 글이 맨 위로 오도록 배열 앞에 추가
+            currentLogs.unshift(newLog);
+            localStorage.setItem("pet_fever_logs", JSON.stringify(currentLogs));
+            
+            // 새 알림이 왔으므로 벨 아이콘에 빨간 점 표시
+            document.getElementById("header-noti-dot").style.display = "block";
+        }
 
-    </div>
+        // 3. 알림창 열기 및 로컬스토리지 빌드
+        function openNotificationModal() {
+            document.getElementById("notiModal").style.display = "flex";
+            document.getElementById("header-noti-dot").style.display = "none"; // 읽었으니 빨간 점 해제
+            
+            const container = document.getElementById("history-container");
+            const logs = JSON.parse(localStorage.getItem("pet_fever_logs")) || [];
+            
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="no-history">🔔 아직 기록된 알림 내역이 없습니다.</div>`;
+                return;
+            }
 
-<script>
+            // 로그 데이터를 화이트 테마 아이템 양식으로 매핑하여 드로우
+            container.innerHTML = logs.map(log => `
+                <div class="history-item">
+                    <div class="alert-icon">🌡️</div>
+                    <div class="alert-details">
+                        <div class="alert-title">${log.title}</div>
+                        <div class="alert-time" style="color:#ff5b5b; font-weight:600;">${log.body}</div>
+                        <div class="alert-time">${log.time}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-// =========================
-// 페이지 이동
-// =========================
+        function closeNotificationModal(e) {
+            document.getElementById("notiModal").style.display = "none";
+        }
 
-function goMonitor(){
-location.href="/monitor";
-}
+        function clearAllHistory() {
+            if (confirm("정말 모든 알림 기록을 삭제하시겠습니까?")) {
+                localStorage.removeItem("pet_fever_logs");
+                openNotificationModal(); // 화면 새로고침 효과
+            }
+        }
 
-function goControl(){
-location.href="/control_page";
-}
+        // 페이지 진입 시 새 알림이 있는지 체크해서 빨간 점 처리
+        const checkLogs = JSON.parse(localStorage.getItem("pet_fever_logs")) || [];
+        if (checkLogs.length > 0) {
+            // 마지막으로 모달을 열지 않은 새 로그가 있다면 켜두기 지향 (여기서는 간단히 목록이 있으면 점 표시)
+            document.getElementById("header-noti-dot").style.display = "block";
+        }
 
-// =========================
-// AUTO TRACK
-// =========================
-
-let tracking=false;
-
-async function toggleTrack(){
-
-tracking=!tracking;
-
-const response=
-await fetch(
-"/control",
-{
-method:"POST",
-
-headers:{
-"Content-Type":
-"application/json"
-},
-
-body:
-JSON.stringify({
-
-command:
-tracking
-?
-"AUTO_TRACK_ON"
-:
-"AUTO_TRACK_OFF"
-
-})
-
-}
-);
-
-console.log(
-await response.text()
-);
-
-}
-
-async function updateStatus(){
-
-const res=
-await fetch(
-"/status"
-);
-
-const data=
-await res.json();
-
-document
-.getElementById(
-"battery"
-)
-.innerText=
-data.battery+"%";
-
-document
-.getElementById(
-"wifi"
-)
-.innerText=
-data.wifi;
-
-document
-.getElementById(
-"status"
-)
-.innerText=
-data.state;
-
-document
-.getElementById(
-"mode"
-)
-.innerText=
-data.mode;
-
-document
-.getElementById(
-"detected"
-)
-.innerText=
-data.detected;
-
-}
-
-setInterval(
-updateStatus,
-1000
-);
-
-updateStatus();
-
-</script>
-
+        setInterval(fetchRobotSystemStatus, 2000);
+        fetchRobotSystemStatus();
+    </script>
 </body>
 </html>

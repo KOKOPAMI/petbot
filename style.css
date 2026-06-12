@@ -1,270 +1,637 @@
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
+/* style.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background: #0d1117; /* 깊은 다크 블루/그레이 */
-    color: #c9d1d9;
+    background-color: #f5f6f8; /* 앱 특유의 부드러운 라이트 그레이 배경 */
+    color: #1e2229;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
 }
 
-/* 상단 헤더 */
-
-.header {
+/* 스마트폰 뷰포트 느낌을 주는 전체 컨테이너 */
+.app-container {
     width: 100%;
-    padding: 20px;
-    background: #161b22;
-    color: #ffffff;
-    font-size: 24px;
-    font-weight: bold;
-    border-bottom: 1px solid #30363d;
-    text-align: center;
+    max-width: 480px;
+    background: #f5f6f8;
+    position: relative;
+    padding-bottom: 80px; /* 하단 네비게이션 공간 확보 */
 }
 
-/* 전체 컨테이너 */
-
-.container{
-
-    padding:20px;
+/* 1. 상단 헤더 영역 */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 20px 10px 20px;
+    background: #f5f6f8;
 }
 
-/* 카드 UI */
+.app-title-box h1 {
+    font-size: 26px;
+    font-weight: 800;
+    color: #111;
+}
 
-.card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 20px;
+.app-title-box p {
+    font-size: 13px;
+    color: #8e94a0;
+    margin-top: 2px;
+}
+
+.noti-icon {
+    font-size: 22px;
+    cursor: pointer;
+    position: relative;
+}
+
+.noti-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    background-color: #ff5b5b;
+    border-radius: 50%;
+}
+
+/* 2. 대시보드 카드 공통 */
+.main-content {
+    padding: 0 20px;
+}
+
+.app-card {
+    background: #ffffff;
+    border-radius: 24px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
-}
-
-/* 상태 정보 */
-
-.status-row{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    margin-bottom:12px;
-
-    font-size:18px;
-}
-
-/* 버튼 영역 */
-
-.button-group{
-
-    display:flex;
-
-    gap:15px;
-
-    margin-top:20px;
-}
-
-/* 공통 버튼 */
-
-.btn{
-
-    flex:1;
-
-    height:60px;
-
-    border:none;
-
-    border-radius:18px;
-
-    font-size:18px;
-    font-weight:bold;
-
-    cursor:pointer;
-
-    transition:0.2s;
-}
-
-/* 버튼 눌림 효과 */
-
-.btn:active{
-    background: #30363d;
-    transform: scale(0.95);
-}
-
-/* 파란 버튼 */
-
-.btn-blue{
-
-    background:#4f7cff;
-
-    color:white;
-}
-
-/* 초록 버튼 */
-
-.btn-green{
-
-    background:#46c98f;
-
-    color:white;
-}
-
-/* 기준점 박스: 패딩을 없애고 자식 요소들이 이 박스 기준으로 겹치게 설정 */
-.video-box {
-    position: relative;
-    width: 100%;
-    background: #000000;
-    border-radius: 20px;
-    overflow: hidden;
-    padding: 0 !important; /* 영상에 딱 맞게 여백 제거 */
-}
-
-.hud-live {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    background: rgba(0, 0, 0, 0.65); /* 영상이 보여야 하므로 반투명 블랙 */
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: bold;
-    color: #ff4d4d;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
     display: flex;
     align-items: center;
-    gap: 6px;
-    z-index: 10; /* 비디오보다 무조건 위에 배치 */
-    border: 1px solid rgba(255, 77, 77, 0.2);
-    letter-spacing: 1px;
 }
 
-/* 빨간 점이 숨쉬듯 커졌다 작아지는 애니메이션 효과 */
-.live-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #ff4d4d;
-    border-radius: 50%;
-    display: inline-block;
-    animation: hudPulse 1.5s infinite;
+/* 로봇 프로필 정보 레이아웃 */
+.robot-profile {
+    display: flex;
+    width: 100%;
+    gap: 20px;
 }
 
-@keyframes hudPulse {
-    0% { transform: scale(0.8); opacity: 0.4; }
-    50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px #ff4d4d; }
-    100% { transform: scale(0.8); opacity: 0.4; }
+.robot-img-box {
+    flex: 1;
+    background: #f9fafb;
+    border-radius: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
 }
 
-/* 2. 밀리터리 모서리 조준선 공통 스타일 */
-.hud-bracket {
-    position: absolute;
-    width: 24px;
-    height: 24px;
-    border: 3px solid #00ff66; /* 드론/군용 장비 특유의 형광 초록 */
-    z-index: 5;
-    pointer-events: none; /* 중요: 마우스나 터치 클릭이 비디오를 가로막지 않게 방해 해제 */
-    filter: drop-shadow(0 0 4px #00ff66); /* 네온 불빛 효과 */
+.robot-img-box img {
+    width: 100%;
+    max-width: 100px;
+    height: auto;
+    object-fit: contain;
 }
 
-/* 각 테두리 선을 쳐서 ㄱ, ㄴ 모양의 모서리 괄호 만들기 */
-.top-left {
-    top: 20px; left: 20px;
-    border-right: none; border-bottom: none;
-}
-.top-right {
-    top: 20px; right: 20px;
-    border-left: none; border-bottom: none;
-}
-.bottom-left {
-    bottom: 20px; left: 20px;
-    border-right: none; border-top: none;
-}
-.bottom-right {
-    bottom: 20px; right: 20px;
-    border-left: none; border-top: none;
+.robot-info-box {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
 }
 
-video{
-
-    width:100%;
-
-    max-width:640px;
-
-    height:auto;
-
-    border-radius:12px;
-
-    object-fit:contain;
+.robot-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #4e5561;
 }
 
-/* 하단 네비게이션 */
+.robot-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+}
 
+.status-badge {
+    background: #e6f7ed;
+    color: #26aa5c;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.battery-bar-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: #26aa5c;
+}
+
+/* 섹션 타이틀 */
+.section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #222;
+    margin: 10px 0 14px 4px;
+}
+
+/* 3. 빠른 실행 2분할 버튼 그리드 */
+.quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.quick-btn {
+    border: none;
+    border-radius: 20px;
+    height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.quick-btn:active {
+    transform: scale(0.96);
+    opacity: 0.9;
+}
+
+.btn-blue { background: #3b82f6; }   /* 실시간 보기 블루 */
+.btn-green { background: #10b981; }  /* 원격 제어 그린 */
+
+.quick-btn .icon {
+    font-size: 28px;
+}
+
+/* 4. 하단 고정 네비게이션 바 */
 .bottom-nav {
     position: fixed;
     bottom: 0;
     width: 100%;
-    height: 70px;
-    background: #161b22;
-    border-top: 1px solid #30363d;
+    max-width: 480px;
+    height: 74px;
+    background: #ffffff;
+    border-top: 1px solid #eaeaea;
     display: flex;
     justify-content: space-around;
     align-items: center;
+    z-index: 100;
 }
-
-/* 네비 버튼 */
 
 .nav-item {
-    font-size: 13px;
-    color: #8b949e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 11px;
+    color: #b0b5c0;
+    cursor: pointer;
+    gap: 4px;
 }
 
-/* ========================================================
-   🕹️ [추가] 가상 조이스틱 (NippleJS) 스타일 구역
-   ======================================================== */
+.nav-item.active {
+    color: #3b82f6; /* 활성화된 탭은 블루 컬러 */
+}
 
-/* 조이스틱을 감싸는 전체 구역 영역 지정 */
-.joystick-wrapper {
+.nav-item .icon {
+    font-size: 20px;
+}
+
+/* 비디오 상단 오버레이 가이드라인 */
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+    background: #000;
+}
+
+.video-wrapper video {
+    width: 100%;
+    display: block;
+}
+
+/* 이미지 속 화면 위에 올라간 녹색 실시간 배지 */
+.video-overlay-hud {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    backdrop-filter: blur(4px);
+}
+
+.live-dot-green {
+    width: 7px;
+    height: 7px;
+    background-color: #26aa5c;
+    border-radius: 50%;
+    animation: blink-live 1.5s infinite;
+}
+
+@keyframes blink-live {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+/* HD 배지 (우측 상단) */
+.video-overlay-quality {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* 하단 스탯 2분할 그리드 레이아웃 */
+.status-grid-2cell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.monitor-status-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 95px;
+}
+
+.monitor-status-card .label {
+    font-size: 12px;
+    color: #8e94a0;
+    font-weight: 600;
+}
+
+.monitor-status-card .value-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.monitor-status-card .value {
+    font-size: 18px;
+    font-weight: 800;
+    color: #111111;
+}
+
+.monitor-status-card .sub-text {
+    font-size: 11px;
+    color: #b0b5c0;
+    margin-top: 2px;
+}
+
+/* 하단 액션 커스텀 컬러 스위치 버튼 */
+.action-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.action-bar-btn {
+    border: none;
+    height: 54px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.action-bar-btn:active {
+    transform: scale(0.97);
+}
+
+.btn-action-purple { background: #8b5cf6; } /* 자동 추적용 보라색 */
+.btn-action-blue { background: #3b82f6; }   /* 음성 송출용 블루 */
+
+/* 원형 제어 패드 레이아웃 (이미지 속 대형 조이스틱) */
+.joystick-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    height: 220px; /* 조이스틱이 노는데 답답하지 않은 높이 */
-    margin-top: 20px;
-    margin-bottom: 90px; /* 💡 하단 네비게이션 바(70px)에 가려지지 않도록 안전 마진 추가 */
-    background: rgba(22, 27, 34, 0.6); /* 대시보드 테마와 통일감을 주는 반투명 어두운 배경 */
-    border: 1px solid #30363d;
+    margin: 30px 0;
+    position: relative;
+}
+
+.wheel-pad {
+    width: 220px;
+    height: 220px;
+    background: #ffffff;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    border: 1px solid #eaeaea;
+}
+
+/* 상하좌우 방향 버튼 배치 */
+.wheel-btn {
+    position: absolute;
+    border: none;
+    background: none;
+    font-size: 18px;
+    font-weight: 700;
+    color: #4e5561;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.1s;
+}
+.wheel-btn:active { color: #3b82f6; }
+
+.btn-up    { top: 15px;  left: 50%; transform: translateX(-50%); }
+.btn-down  { bottom: 15px; left: 50%; transform: translateX(-50%); }
+.btn-left  { left: 15px;  top: 50%; transform: translateY(-50%); }
+.btn-right { right: 15px; top: 50%; transform: translateY(-50%); }
+
+.wheel-btn span {
+    font-size: 11px;
+    color: #8e94a0;
+    margin-top: 2px;
+}
+
+/* 중앙 정지 버튼 큐브 */
+.btn-center-stop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 76px;
+    height: 76px;
+    background: #f5f6f8;
+    border: 1px solid #eaeaea;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #111;
+    cursor: pointer;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+.btn-center-stop:active { background: #eef0f3; }
+.btn-center-stop .stop-icon {
+    width: 14px;
+    height: 14px;
+    background: #333;
+    border-radius: 3px;
+    margin-bottom: 4px;
+}
+
+/* 맨 하단 3분할 컨트롤 바 (긴급정지 / 속도 / 음성) */
+.control-bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+/* 긴급 정지 (레드 서클 버튼) */
+.btn-emergency-stop {
+    width: 65px;
+    height: 65px;
+    border: none;
+    background: #ff5b5b;
+    color: white;
     border-radius: 20px;
-    box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.15); /* 은은한 하이테크 네온 블루 광채 */
-    position: relative;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255, 91, 91, 0.2);
 }
 
-/* 실제 조이스틱 가상 패드가 생성되는 터치 영역 존 */
-#joystick-zone {
-    width: 200px;
-    height: 200px;
-    position: relative;
+/* 속도 조절 패널 (중앙 캡슐형) */
+.speed-capsule {
+    flex: 1;
+    height: 52px;
+    background: #ffffff;
+    border-radius: 26px;
+    border: 1px solid #eaeaea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.02);
 }
 
-/* 💡 NippleJS가 생성하는 가상 패드 자체의 터치 반응성 보완 */
-#joystick-zone .nipple {
-    transition: opacity 0.2s ease;
+.speed-step-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: #f5f6f8;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 700;
+    color: #555;
+    cursor: pointer;
+}
+.speed-step-btn:active { background: #eaeaea; }
+
+.speed-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.speed-label span {
+    font-size: 9px;
+    color: #8e94a0;
+    font-weight: 500;
+    margin-bottom: 1px;
 }
 
-/* 모바일 대응 */
+/* 하단 음성/기타 서클 버튼 */
+.btn-sub-action {
+    width: 54px;
+    height: 52px;
+    border: none;
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #eaeaea;
+    font-size: 11px;
+    font-weight: 700;
+    color: #4e5561;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+}
 
-@media(max-width:600px){
+/* 알림 기록 모달 전체 배경 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: none; /* 기본은 숨김 */
+    justify-content: center;
+    align-items: flex-end; /* 아래에서 위로 올라오는 앱 감성 효과 */
+    z-index: 1000;
+}
 
-    .header{
+/* 모달 컨텐츠 박스 */
+.modal-content {
+    width: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-top-left-radius: 30px;
+    border-top-right-radius: 30px;
+    padding: 24px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08);
+    animation: slide-up 0.3s ease-out;
+}
 
-        font-size:24px;
-    }
+@keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
 
-    .status-row{
+/* 모달 헤더 */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+}
+.modal-close-btn {
+    font-size: 20px;
+    cursor: pointer;
+    color: #8e94a0;
+}
 
-        font-size:16px;
-    }
+/* 알림 목록 리스트 구역 */
+.history-list {
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
-    .btn{
+/* 알림 항목 한 줄 */
+.history-item {
+    background: #f9fafb;
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    border: 1px solid #f0f1f3;
+}
 
-        font-size:16px;
-    }
+.history-item .alert-icon {
+    font-size: 22px;
+    background: #fdeded;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.history-item .alert-details {
+    flex: 1;
+}
+
+.history-item .alert-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111;
+}
+
+.history-item .alert-time {
+    font-size: 11px;
+    color: #8e94a0;
+    margin-top: 2px;
+}
+
+/* 기록이 없을 때 보여줄 안내 */
+.no-history {
+    text-align: center;
+    color: #8e94a0;
+    padding: 40px 0;
+    font-size: 14px;
+}
+
+/* 전체 삭제 버튼 */
+.clear-history-btn {
+    background: #f5f6f8;
+    border: none;
+    padding: 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ff5b5b;
+    cursor: pointer;
+    margin-top: 15px;
 }
