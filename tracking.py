@@ -37,7 +37,7 @@ class RobotTracker:
         else:
             self.detected_object = "NONE"
 
-        annotated_frame = frame.copy()
+        annotated_frame = frame  # 스트림은 원본 사용, 주석은 상태 API로 확인
 
         # 3. 상태 머신 (State Machine) 제어
         if self.current_state == "MANUAL":

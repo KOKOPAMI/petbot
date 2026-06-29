@@ -232,11 +232,32 @@ body {
     display: block;
 }
 
-/* 이미지 속 화면 위에 올라간 녹색 실시간 배지 */
-.video-overlay-hud {
+/* 영상 좌측 상단 오버레이 묶음 */
+.video-overlay-left {
     position: absolute;
     top: 15px;
     left: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    z-index: 2;
+}
+
+.video-overlay-mode {
+    background: rgba(0, 0, 0, 0.65);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    backdrop-filter: blur(4px);
+    letter-spacing: -0.2px;
+}
+
+/* 이미지 속 화면 위에 올라간 녹색 실시간 배지 */
+.video-overlay-hud {
+    position: static;
     display: flex;
     align-items: center;
     gap: 6px;

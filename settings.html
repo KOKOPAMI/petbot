@@ -164,22 +164,16 @@
         async function submitLogout() {
             if (!confirm("로그아웃 하시겠습니까?")) return;
             try {
-                // 🌟 주소 앞에 슬래시(/)가 잘 붙어있는지, method가 대문자 'POST'인지 꼭 확인!
                 const response = await fetch('/logout', { 
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    method: 'POST', // 👈 ❌
+                    headers: { 'Content-Type': 'application/json' }
                 });
-                
                 if (response.ok) {
                     alert("안전하게 로그아웃되었습니다.");
-                    location.href = '/login'; // 로그인 창으로 유턴
-                } else {
-                    alert("로그아웃 실패 (서버 에러코드: " + response.status + ")");
+                    location.href = '/'; // ◀ 홈 주소로 던지면 문지기가 캐치해서 로그인 화면을 안전하게 서빙합니다!
                 }
             } catch (e) {
-                alert("서버 통신 실패: " + e);
+                alert("서버 통신 실패");
             }
         }
 

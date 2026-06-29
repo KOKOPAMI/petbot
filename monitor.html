@@ -21,8 +21,11 @@
         <div class="main-content">
             
             <div class="video-wrapper">
-                <div class="video-overlay-hud">
-                    <span class="live-dot-green"></span> 실시간
+                <div class="video-overlay-left">
+                    <div class="video-overlay-mode" id="video-mode-overlay">수동 제어</div>
+                    <div class="video-overlay-hud">
+                        <span class="live-dot-green"></span> 실시간
+                    </div>
                 </div>
                 <div class="video-overlay-quality">HD 📶</div>
                 <video id="video" autoplay playsinline muted></video>
@@ -36,7 +39,7 @@
                             <span style="font-size: 20px;">🎯</span>
                             <span class="value" id="mode-text" style="color: #8b5cf6;">수동 제어</span>
                         </div>
-                        <p class="sub-text" id="detected-sub">감지: NONE</p>
+                        <p class="sub-text" id="mode-sub">원격 수동 조종 가능</p>
                     </div>
                 </div>
 
@@ -50,6 +53,11 @@
                         <p class="sub-text" id="temp-sub-text">정상 체온 범위</p>
                     </div>
                 </div>
+            </div>
+
+            <div class="app-card" style="padding: 14px 20px; margin-bottom: 10px; justify-content: space-between; font-size: 14px; color: #4e5561;">
+                <span>인식 객체</span>
+                <span id="detected-display" style="font-weight: 700; color: #111;">없음</span>
             </div>
 
             <div class="app-card" style="padding: 14px 20px; margin-bottom: 25px; justify-content: space-between; font-size: 14px; color: #4e5561;">
@@ -128,16 +136,32 @@ async function toggleTracking(){
 
 function updateButtonUI(isTracking) {
     const btnText = document.getElementById("track-btn-text");
-    const modeText = document.getElementById("mode-text");
     if (isTracking) {
         btnText.innerText = "자동 추적 OFF";
-        modeText.innerText = "자동 추적 중";
-        modeText.style.color = "#46c98f";
     } else {
         btnText.innerText = "자동 추적 ON";
-        modeText.innerText = "수동 제어";
-        modeText.style.color = "#8b5cf6";
     }
+}
+
+const MODE_LABELS = {
+    MANUAL: "수동 제어",
+    EXPLORATION: "순찰 중",
+    TRACKING: "자동 추적 중",
+    RECOVERY: "복구 중"
+};
+
+const DETECTED_LABELS = {
+    NONE: "없음",
+    Dog: "강아지",
+    Cat: "고양이"
+};
+
+function formatModeLabel(mode) {
+    return MODE_LABELS[mode] || mode || "수동 제어";
+}
+
+function formatDetectedLabel(detected) {
+    return DETECTED_LABELS[detected] || detected || "없음";
 }
 
 // 3. 🔥 [동기화 고도화] 1초 주기 상태 동기화 및 홈 화면 알림 연동 엔진
@@ -147,9 +171,17 @@ async function updateStatus(){
         if (!res.ok) return;
         const data = await res.json();
 
-        // 기본 텍스트 필드 매핑
-        document.getElementById("detected-sub").innerText = `감지: ${data.detected}`;
+        const modeLabel = formatModeLabel(data.mode);
+        const detectedLabel = formatDetectedLabel(data.detected);
+
+        document.getElementById("detected-display").innerText = detectedLabel;
         document.getElementById("motor-text").innerText = `${data.left} / ${data.right} RPM`;
+        document.getElementById("video-mode-overlay").innerText = modeLabel;
+        document.getElementById("mode-text").innerText = modeLabel;
+        document.getElementById("mode-text").style.color = data.mode === "MANUAL" ? "#8b5cf6" : "#46c98f";
+        document.getElementById("mode-sub").innerText = data.detected !== "NONE"
+            ? `${detectedLabel} 감지됨`
+            : "감지된 객체 없음";
 
         const tempDisplay = document.getElementById("pet-temp-display");
         const tempCard = document.getElementById("temp-card-container");

@@ -24,14 +24,11 @@ def hash_password(password: str) -> str:
 # 🛡️ [다중 사용자용 문지기] 단순 true 검사가 아닌, 어떤 사용자인지 아이디를 식별합니다.
 @web.middleware
 async def auth_middleware(request, handler):
-    # 로그인 폼, 회원가입 API, 스타일시트는 무조건 프리패스
-    if request.path in ["/login", "/register", "/style.css"]:
+    # 🌟 예외 목록에 "/logout"을 명확하게 추가해 줍니다!
+    if request.path in ["/login", "/register", "/style.css", "/logout"]:
         return await handler(request)
         
-    # 🔑 쿠키에서 로그인한 사람의 '고유 아이디 명찰'을 꺼내옵니다.
     session_user = request.cookies.get("session_user")
-    
-    # 아이디 명찰이 없다면 로그인 안 한 사람이므로 로그인 창으로 튕겨냅니다.
     if not session_user:
         try:
             with open("login.html", "r", encoding="utf-8") as f:
@@ -39,7 +36,6 @@ async def auth_middleware(request, handler):
         except FileNotFoundError:
             return web.Response(status=404, text="login.html 파일을 찾을 수 없습니다.")
     
-    # 💡 다른 페이지 핸들러에서 request['user']로 현재 로그인한 유저를 식별할 수 있게 배달
     request['user'] = session_user
     return await handler(request)
 

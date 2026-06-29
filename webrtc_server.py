@@ -36,7 +36,7 @@ model = YOLO("best (1).pt")
 pcs = set()
 last_command = "STOP"
 
-cap = cv2.VideoCapture(0)  
+cap = cv2.VideoCapture(1)  
 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
@@ -46,14 +46,15 @@ cap.set(cv2.CAP_PROP_FPS, 20)
 init_db()
 
 # =================================================================
-# 스레드 안전한 비동기 큐 (최신 프레임 1개만 유지)
+# 스레드 안전 프레임 큐 (카메라 스레드 → YOLO, 최신 1장만 유지)
 # =================================================================
-frame_queue = asyncio.Queue(maxsize=1)
+inference_frame_queue = queue.Queue(maxsize=1)
 
 battery = 82
 wifi = "CONNECTED"
 robot_state = "ONLINE"
-latest_annotated_frame = None
+latest_stream_frame = None
+stream_frame_lock = threading.Lock()
 
 shared_status_cache = {
     "battery": 82,
@@ -70,40 +71,42 @@ shared_status_cache = {
 # ==========================================
 # 백그라운드 스레드 및 루프 고도화
 # ==========================================
-def camera_reader_thread(loop):
-    global is_running
+def camera_reader_thread():
+    global is_running, latest_stream_frame
     print("📸 [1단계] 카메라 버퍼 드레인 스레드 가동 완료")
     while is_running:
         ret, frame = cap.read()
         if ret:
-            asyncio.run_coroutine_threadsafe(push_frame_to_queue(frame), loop)
+            with stream_frame_lock:
+                latest_stream_frame = frame
+
+            if inference_frame_queue.full():
+                try:
+                    inference_frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            inference_frame_queue.put(frame.copy())
         else:
             time.sleep(0.01)
 
-async def push_frame_to_queue(frame):
-    if frame_queue.full():
-        try:
-            frame_queue.get_nowait()
-        except asyncio.QueueEmpty:
-            pass
-    await frame_queue.put(frame)
-
 async def camera_inference_loop():
-    global latest_annotated_frame, is_running, shared_status_cache
+    global is_running, shared_status_cache
     print("✅ [2단계] 백그라운드 YOLO 분석 및 모터 제어 루프 가동 시작")
     
     while is_running:
         try:
-            current_frame = await frame_queue.get()
+            try:
+                current_frame = await asyncio.to_thread(
+                    inference_frame_queue.get, True, 0.1
+                )
+            except queue.Empty:
+                continue
             
-            annotated_frame = await asyncio.to_thread(
+            await asyncio.to_thread(
                 tracker.process_yolo_and_control, 
                 current_frame, 
                 model
             )
-            
-            latest_annotated_frame = annotated_frame
-            frame_queue.task_done()
 
             shared_status_cache["detected"] = tracker.detected_object
             shared_status_cache["tracking"] = tracker.current_state != "MANUAL"
@@ -111,8 +114,6 @@ async def camera_inference_loop():
             shared_status_cache["left"] = tracker.motor_left
             shared_status_cache["right"] = tracker.motor_right
             shared_status_cache["pet_temp"] = round(sensor_driver.pet_temp, 1)
-
-            await asyncio.sleep(0.01)
 
         except asyncio.CancelledError:
             break
@@ -129,14 +130,20 @@ async def memory_leak_cleaner_loop():
 
 class CameraTrack(VideoStreamTrack):
     async def recv(self):
-        global latest_annotated_frame
+        global latest_stream_frame
         pts, time_base = await self.next_timestamp()
 
-        while latest_annotated_frame is None:
-            await asyncio.sleep(0.01)
+        frame_to_send = None
+        while frame_to_send is None:
+            with stream_frame_lock:
+                if latest_stream_frame is not None:
+                    frame_to_send = latest_stream_frame.copy()
+            if frame_to_send is None:
+                await asyncio.sleep(0.005)
 
-        frame_to_send = latest_annotated_frame.copy()
-        frame_rgb = cv2.cvtColor(frame_to_send, cv2.COLOR_BGR2RGB)
+        frame_rgb = await asyncio.to_thread(
+            cv2.cvtColor, frame_to_send, cv2.COLOR_BGR2RGB
+        )
         video_frame = av.VideoFrame.from_ndarray(frame_rgb, format="rgb24")
         video_frame.pts = pts
         video_frame.time_base = time_base
@@ -317,8 +324,7 @@ async def start_background_tasks(app_context):
     sensor_driver.start_loop() 
     print("🌡️ [3단계] 실시간 체온 센서 하드웨어 루프 가동 완료")
 
-    current_loop = asyncio.get_running_loop()
-    t_cam = threading.Thread(target=camera_reader_thread, args=(current_loop,), daemon=True)
+    t_cam = threading.Thread(target=camera_reader_thread, daemon=True)
     t_cam.start()
 
     app_context['camera_loop'] = asyncio.create_task(camera_inference_loop())
