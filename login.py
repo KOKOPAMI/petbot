@@ -21,24 +21,32 @@ def init_db():
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
+PUBLIC_GET_PATHS = {"/login", "/style.css"}
+PUBLIC_POST_PATHS = {"/login", "/register", "/logout"}
+
 # 🛡️ [다중 사용자용 문지기] 단순 true 검사가 아닌, 어떤 사용자인지 아이디를 식별합니다.
 @web.middleware
 async def auth_middleware(request, handler):
-    # 🌟 예외 목록에 "/logout"을 명확하게 추가해 줍니다!
-    if request.path in ["/login", "/register", "/style.css", "/logout"]:
+    if request.path in PUBLIC_GET_PATHS:
         return await handler(request)
-        
+    if request.method == "POST" and request.path in PUBLIC_POST_PATHS:
+        return await handler(request)
+
     session_user = request.cookies.get("session_user")
     if not session_user:
-        try:
-            with open("login.html", "r", encoding="utf-8") as f:
-                return web.Response(text=f.read(), content_type="text/html")
-        except FileNotFoundError:
-            return web.Response(status=404, text="login.html 파일을 찾을 수 없습니다.")
-    
+        raise web.HTTPFound("/login")
+
     request['user'] = session_user
     return await handler(request)
 
+
+async def login_page_handler(request):
+    with open("login.html", "r", encoding="utf-8") as f:
+        return web.Response(
+            text=f.read(),
+            content_type="text/html"
+        )
+        
 # 🔐 회원가입 API 처리
 async def register_handler(request):
     data = await request.json()
@@ -77,8 +85,11 @@ async def login_handler(request):
 
     if row and row[0] == hashed:
         response = web.Response(text="OK")
-        # 🌟 실제 로그인한 유저의 "아이디"를 30일짜리 쿠키 명찰로 구워줍니다.
-        response.set_cookie("session_user", username, max_age=2592000, httponly=True)
+        response.set_cookie(
+            "session_user",
+            username,
+            httponly=True
+        )
         return response
     else:
         return web.HTTPUnauthorized(text="FAIL")

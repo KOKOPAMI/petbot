@@ -8,9 +8,10 @@ import time
 import threading
 import subprocess
 from aiohttp import web
+import numpy as np
 
 # 🌟 login.py 파일에서 안전하게 다중 사용자 인증 기능들을 가져옵니다.
-from login import init_db, auth_middleware, login_handler, register_handler
+from login import init_db, auth_middleware, login_handler, register_handler, login_page_handler
 
 # sensor.py 호출 및 센서 인스턴스 생성
 from sensor import TemperatureSensor
@@ -32,11 +33,35 @@ from aiortc import (
 )
 from motor import set_motor_speed
 
+# ==========================
+# 실시간 볼륨 제어
+# ==========================
+
+volume_gain = 1.0
+volume_lock = threading.Lock()
+
 model = YOLO("best (1).pt")
 pcs = set()
 last_command = "STOP"
 
-cap = cv2.VideoCapture(1)  
+cap = None
+
+for i in range(1, 5):
+    tmp = cv2.VideoCapture(i)
+
+    if tmp.isOpened():
+        ret, frame = tmp.read()
+
+        if ret:
+            cap = tmp
+            print(f"📷 카메라 선택됨: /dev/video{i}")
+            break
+
+        tmp.release()
+
+if cap is None:
+    raise RuntimeError("카메라를 찾지 못했습니다.")
+
 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
@@ -196,7 +221,7 @@ async def control(request):
         return web.Response(text="MANUAL MODE (STOP)")
 
     tracker.current_state = "MANUAL"      
-    speed = 160
+    speed = 100
 
     if command == "FORWARD":
         tracker.motor_left, tracker.motor_right = speed, speed
@@ -212,10 +237,36 @@ async def control(request):
     set_motor_speed(tracker.motor_left, tracker.motor_right)
     return web.Response(text="OK")
 
+async def set_volume(request):
+    global volume_gain
+
+    data = await request.json()
+
+    try:
+        value = float(data.get("volume", 100))
+
+        value = max(0, min(100, value))
+
+        with volume_lock:
+            volume_gain = value / 100.0
+
+        return web.json_response({
+            "success": True,
+            "volume": value
+        })
+
+    except Exception as e:
+        return web.json_response({
+            "success": False,
+            "error": str(e)
+        })
+
 # 🚪 로그아웃 처리: 브라우저의 명찰 쿠키를 만료시켜 제거합니다.
 async def logout_handler(request):
-    response = web.Response(text="OK")
+    response = web.HTTPFound("/login")
+
     response.del_cookie("session_user")
+
     return response
 
 # 💻 원격 재부팅 처리: 파이썬이 리눅스 시스템에 직접 sudo reboot 명령을 전송합니다.
@@ -224,26 +275,81 @@ async def reboot_handler(request):
     subprocess.Popen(["sudo", "reboot"])
     return web.Response(text="REBOOTING")
 
-audio_queue = queue.Queue(maxsize=2)
+audio_queue = queue.Queue(maxsize=50)
+
+resampler = av.AudioResampler(
+    format="s16",
+    layout="mono",
+    rate=48000
+)
+
+# ======================================
+# USB 오디오 장치 선택
+# ======================================
+
 p = pyaudio.PyAudio()
-stream = p.open(format=pyaudio.paInt16, channels=1, rate=48000, output=True)
-resampler = av.AudioResampler(format='s16', layout='mono', rate=48000)
+
+device_index = None
+
+for i in range(p.get_device_count()):
+    info = p.get_device_info_by_index(i)
+
+    print(
+        f"[AUDIO DEVICE] {i}: "
+        f"{info['name']} "
+        f"(OUT={info['maxOutputChannels']})"
+    )
+
+    if (
+        info["maxOutputChannels"] > 0
+        and (
+            "pulse" in info["name"].lower()
+            or "uac" in info["name"].lower()
+            or "usb" in info["name"].lower()
+        )
+    ):
+        device_index = i
+        break
+
+if device_index is None:
+    device_index = p.get_default_output_device_info()["index"]
+
+print(f"🎧 출력 장치 선택: {device_index}")
+
+if device_index is None:
+    device_index = p.get_default_output_device_info()["index"]
+    print(f"⚠️ 기본 출력 사용: {device_index}")
+
+stream = p.open(
+    format=pyaudio.paInt16,
+    channels=1,
+    rate=48000,
+    output=True,
+    output_device_index=device_index,
+    frames_per_buffer=2048
+)
 
 def audio_playback_worker():
     global is_running
-    print("🔊 [오디오 엔진] 전용 스레드가 완벽하게 기동되었습니다.")
+
+    print("🔊 [오디오 엔진] USB 스피커 출력 시작")
+
     while is_running:
+
         try:
-            audio_data = audio_queue.get(timeout=0.5)
-            if audio_data is None:
-                continue
-            stream.write(audio_data)
-            audio_queue.task_done()
+            audio_data = audio_queue.get(timeout=0.3)
+
+            stream.write(
+                audio_data,
+                exception_on_underflow=False
+            )
+
         except queue.Empty:
             continue
+
         except Exception as e:
-            print(f"⚠️ 오디오 일꾼 스레드 내부 출력 오류: {e}")
-            time.sleep(0.1)
+            print("🔇 출력 오류:", e)
+            time.sleep(0.05)
 
 t_audio_worker = threading.Thread(target=audio_playback_worker, daemon=True)
 t_audio_worker.start()
@@ -267,23 +373,74 @@ async def offer(request):
 
     @pc.on("track")
     async def on_track(track):
-        if track.kind == "audio":
-            print("▶ [WebRTC] 아이폰 마이크 트랙 연결 성공!")
-            while is_running:
+
+        if track.kind != "audio":
+            return
+
+        print("▶ [WebRTC] 아이폰 마이크 트랙 연결 성공!")
+
+        while is_running:
+
+            try:
+                frame = await track.recv()
+
+                if frame is None:
+                    continue
+
                 try:
-                    frame = await track.recv()
-                    resampled_frames = resampler.resample(frame)
-                    for r_frame in resampled_frames:
-                        audio_data = r_frame.to_ndarray().tobytes()
-                        while audio_queue.qsize() > 0:
-                            try:
-                                audio_queue.get_nowait()
-                            except queue.Empty:
-                                break
+                    frames = resampler.resample(frame)
+
+                except Exception:
+                    frames = [frame]
+
+                if not isinstance(frames, list):
+                    frames = [frames]
+
+                for f in frames:
+
+                    pcm = f.to_ndarray()
+
+                    if pcm is None:
+                        continue
+
+                    with volume_lock:
+                        gain = volume_gain
+
+                    pcm = pcm.astype(np.float32)
+
+                    pcm *= gain
+
+                    pcm = np.clip(
+                        pcm,
+                        -32768,
+                        32767
+                    ).astype(np.int16)
+
+                    audio_data = pcm.tobytes()
+
+                    try:
+
+                        if audio_queue.full():
+                            audio_queue.get_nowait()
+
                         audio_queue.put_nowait(audio_data)
-                except Exception as e:
-                    print("마이크 연결 종료 또는 에러:", e)
-                    break
+
+                    except queue.Full:
+                        pass
+
+            except asyncio.CancelledError:
+                print("🔇 오디오 트랙 종료")
+                break
+
+            except Exception as e:
+                print(
+                    f"🔇 오디오 수신 오류: "
+                    f"{type(e).__name__}: {e}"
+                )
+
+                await asyncio.sleep(0.1)
+
+                continue
 
     pc.addTrack(CameraTrack())
     await pc.setRemoteDescription(offer_desc)
@@ -359,6 +516,16 @@ app.on_startup.append(start_background_tasks)
 app.on_cleanup.append(cleanup_background_tasks)
 
 # 🌐 웹 페이지 서빙 라우팅 리스트 정리
+app.router.add_get("/login", login_page_handler)
+async def index(request):
+    if not request.cookies.get("session_user"):
+        raise web.HTTPFound("/login")
+
+    with open("index.html", "r", encoding="utf-8") as f:
+        return web.Response(
+            text=f.read(),
+            content_type="text/html"
+        )
 app.router.add_get("/", index)
 app.router.add_get("/monitor", monitor)
 app.router.add_get("/control_page", control_page)
@@ -368,6 +535,7 @@ app.router.add_get("/style.css", style)
 # ⚡ 실시간 통신 및 기능 API 엔드포인트 매핑
 app.router.add_post("/offer", offer)
 app.router.add_post("/control", control)
+app.router.add_post("/volume", set_volume)
 app.router.add_get("/status", get_status)
 
 # 🔑 login.py의 데이터 핸들러 함수들을 매핑합니다 (POST 보안 철저)

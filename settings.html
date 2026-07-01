@@ -170,7 +170,7 @@
                 });
                 if (response.ok) {
                     alert("안전하게 로그아웃되었습니다.");
-                    location.href = '/'; // ◀ 홈 주소로 던지면 문지기가 캐치해서 로그인 화면을 안전하게 서빙합니다!
+                    location.href = '/login';
                 }
             } catch (e) {
                 alert("서버 통신 실패");

@@ -65,11 +65,7 @@
                 <span id="motor-text" style="font-weight: 700; color: #111;">0 / 0 RPM</span>
             </div>
 
-            <div class="action-grid">
-                <button class="action-bar-btn btn-action-blue" id="micToggleBtn" onclick="initiateMicrophone()">
-                    <span>🎤</span> <span id="mic-btn-text">음성 송출 시작</span>
-                </button>
-                
+            <div class="action-grid single">      
                 <button class="action-bar-btn btn-action-purple" id="trackBtn" onclick="toggleTracking()">
                     <span>🧭</span> <span id="track-btn-text">자동 추적 ON</span>
                 </button>
@@ -259,54 +255,47 @@ setInterval(updateStatus, 1000);
 // 4. WebRTC 오디오/비디오 스트리밍 송수신 자원 바인딩
 const video = document.getElementById("video");
 let pc = null;
-let localAudioStream = null;
 
-async function startWebRTC(enableAudio = false) {
-    if (pc) pc.close();
-    pc = new RTCPeerConnection({ iceServers: [] });
+async function startWebRTC() {
 
-    pc.ontrack = (event) => {
-        video.srcObject = event.streams[0];
-        video.play();
-    };
-    pc.addTransceiver("video", { direction: "recvonly" });
+    if(pc) pc.close();
 
-    if (enableAudio) {
-        try {
-            localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
-        } catch (err) {
-            alert("마이크 권한 획득 실패: " + err);
-            return false;
-        }
-    }
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    const response = await fetch("/offer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
+    pc = new RTCPeerConnection({
+        iceServers:[]
     });
 
-    const answer = await response.json();
-    await pc.setRemoteDescription(answer);
-    return true;
-}
+    pc.ontrack=(event)=>{
+        video.srcObject=event.streams[0];
+        video.play();
+    };
 
-async function initiateMicrophone() {
-    const micBtn = document.getElementById('micToggleBtn');
-    const success = await startWebRTC(true);
-    if (success) {
-        micBtn.innerText = "🟢 오디오 송출 중";
-        micBtn.style.backgroundColor = "#26aa5c";
-        micBtn.disabled = true;
-    }
+    pc.addTransceiver(
+        "video",
+        {direction:"recvonly"}
+    );
+
+    const offer=await pc.createOffer();
+
+    await pc.setLocalDescription(offer);
+
+    const response=await fetch("/offer",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            sdp:pc.localDescription.sdp,
+            type:pc.localDescription.type
+        })
+    });
+
+    const answer=await response.json();
+
+    await pc.setRemoteDescription(answer);
 }
 
 // 최초 화면 진입 시 영상 스트림만 자동 수신 시작
-startWebRTC(false);
+startWebRTC();
 </script>
 </body>
 </html>
